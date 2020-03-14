@@ -1,4 +1,4 @@
-#define DEBUG
+//#define DEBUG
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -37,8 +37,6 @@ namespace Oxide.Plugins
         #region init
         void Init()
         {
-            //LoadVariables();
-
             AddCovalenceCommand("tc", "cmdTCGUI");
 
             permission.RegisterPermission("tcgui.use", this);
@@ -51,16 +49,14 @@ namespace Oxide.Plugins
                 ["helptext2"] = "  type /tc to do stuff",
                 ["close"] = "Close",
                 ["me"] = "Me",
+                ["none"] = "None found!",
                 ["cupboard"] = "Cupboard",
+                ["turret"] = "Turret",
                 ["turrets"] = "Turrets",
                 ["select"] = "Select",
                 ["add"] = "Add",
                 ["remove"] = "Remove"
             }, this);
-        }
-
-        void Loaded()
-        {
         }
 
         void Unload()
@@ -71,67 +67,6 @@ namespace Oxide.Plugins
                 CuiHelper.DestroyUi(player, TCGUP);
             }
         }
-
-        protected override void LoadDefaultConfig()
-        {
-//            Config.Settings.ReferenceLoopHandling = ReferenceLoopHandling.Ignore;
-//            Config.Settings.Converters = new JsonConverter[] { new UnityVector3Converter() };
-        }
-
-//        void OnServerInitialized()
-//        {
-//            foreach (BasePlayer user in Player.Players)
-//            {
-//                if(user.IsNpc) continue;
-//
-//                ServerUsers.User servUser = ServerUsers.Get(user.userID);
-//
-//                if(servUser == null || servUser?.group != ServerUsers.UserGroup.Banned)
-//                {
-//                    onlinePlayers[user.UserIDString] = user.displayName;
-//                }
-//            }
-//
-//            foreach(BasePlayer user in Player.Sleepers)
-//            {
-//                if(user.IsNpc) continue;
-//
-//                ServerUsers.User servUser = ServerUsers.Get(user.userID);
-//
-//                if(servUser == null || servUser?.group != ServerUsers.UserGroup.Banned)
-//                {
-//                    offlinePlayers[user.UserIDString] = user.displayName;
-//                }
-//            }
-//        }
-//
-//        void OnUserConnected(IPlayer aPlayer)
-//        {
-//            BasePlayer user = BasePlayer.Find(aPlayer.Id) ?? BasePlayer.FindSleeping(aPlayer.Id);
-//
-//            if(user.IsNpc) return;
-//
-//            if (offlinePlayers.ContainsKey(user.UserIDString))
-//            {
-//                offlinePlayers.Remove(user.displayName);
-//            }
-//
-//            onlinePlayers[user.UserIDString] = user.displayName;
-//        }
-//
-//        void OnUserDisconnected(IPlayer aPlayer)
-//        {
-//            BasePlayer user = BasePlayer.Find(aPlayer.Id) ?? BasePlayer.FindSleeping(aPlayer.Id);
-//
-//            if(onlinePlayers.ContainsKey(user.UserIDString))
-//            {
-//                onlinePlayers.Remove(user.UserIDString);
-//            }
-//
-//            if(user.IsNpc) return;
-//
-//            offlinePlayers[user.UserIDString] = user.displayName;
-//        }
         #endregion
 
         #region Main
@@ -160,7 +95,6 @@ namespace Oxide.Plugins
             {
                 if(args[0] == "guiclose")
                 {
-//                    Puts($"got here {args[0]}");
                     CuiHelper.DestroyUi(player, TCGUI);
                 }
             }
@@ -185,7 +119,7 @@ namespace Oxide.Plugins
                         {
                             if(args.Length > 2)
                             {
-                                // tc guisel turretid
+                                // tc guisel turret turretid
                                 PlayerSelectGUI(player, "turret", uint.Parse(args[2]));
                             }
                             else
@@ -322,8 +256,8 @@ namespace Oxide.Plugins
             CuiElementContainer container = UI.Container(TCGUI, UI.Color("2b2b2b", 0.9f), "0.15 0.1", "0.85 0.9", true, "Overlay");
             UI.Button(ref container, TCGUI, UI.Color("#d85540", 1f), Lang("close"), 12, "0.92 0.93", "0.985 0.98", $"tc guiclose");
             UI.Label(ref container, TCGUI, UI.Color("#ffffff", 1f), Lang("tcgui"), 18, "0.23 0.92", "0.7 1");
-            UI.Label(ref container, TCGUI, UI.Color("#ffffff", 1f), Lang("cupboard"), 14, "0.01 0.83", "0.5 0.9");
-            UI.Label(ref container, TCGUI, UI.Color("#ffffff", 1f), Lang("turrets"), 14, "0.5 0.83", "0.8 0.9");
+            UI.Label(ref container, TCGUI, UI.Color("#ffffff", 1f), Lang("cupboard"), 14, "0.15 0.83", "0.28 0.9");
+            UI.Label(ref container, TCGUI, UI.Color("#ffffff", 1f), Lang("turrets"), 14, "0.3 0.83", "0.8 0.9");
 
             int nc = 0;
             float[] n = GetButtonPosition(nc, 1);
@@ -370,7 +304,7 @@ namespace Oxide.Plugins
             nc++;
 
             float[] poss = GetButtonPosition(nc, 2);
-            UI.Button(ref container, TCGUI, UI.Color("#d85540", 1f), Lang("select"), 12, $"{poss[0]} {poss[1]}", $"{poss[0] + ((poss[2] - poss[0]) / 2)} {poss[3]}", $"tc guisel");
+            UI.Button(ref container, TCGUI, UI.Color("115540", 1f), Lang("select"), 12, $"{poss[0]} {poss[1]}", $"{poss[0] + ((poss[2] - poss[0]) / 2)} {poss[3]}", $"tc guisel");
 
             List<AutoTurret> turrets = GetTurrets(player.transform.position, 30f);
             List<ulong> foundturrets = new List<ulong>();
@@ -412,34 +346,40 @@ namespace Oxide.Plugins
                     nc++;
 
                     posn = GetButtonPosition(nc, 5);
-                    poss = GetButtonPosition(nc + 1, 6);
                     float[] posb = GetButtonPosition(nc, 6);
                     UI.Label(ref container, TCGUI, UI.Color("#ffffff", 1f), theplayer.displayName, 12, $"{posn[0]} {posn[1]}", $"{posn[0] + ((posn[2] - posn[0]) / 2)} {posn[3]}", TextAnchor.MiddleLeft);
                     UI.Button(ref container, TCGUI, UI.Color("#d85540", 1f), Lang("remove"), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"tc tremove {theplayer.userID} {turret.net.ID.ToString()}");
                     // NOT SHOWING :(
-                    UI.Button(ref container, TCGUI, UI.Color("#d85540", 1f), Lang("select"), 12, $"{poss[0]} {poss[1]}", $"{poss[0] + ((poss[2] - poss[0]) / 2)} {poss[3]}", $"tc guisel turret {turret.net.ID.ToString()}");
                 }
+                nc++;
+                poss = GetButtonPosition(nc, 6);
+                UI.Button(ref container, TCGUI, UI.Color("#115540", 1f), Lang("select"), 12, $"{poss[0]} {poss[1]}", $"{poss[0] + ((poss[2] - poss[0]) / 2)} {poss[3]}", $"tc guisel turret {turret.net.ID.ToString()}");
             }
 
             CuiHelper.AddUi(player, container);
         }
 
-        void PlayerSelectGUI(BasePlayer player, string mode = "tc", uint turretid=0)
+        void PlayerSelectGUI(BasePlayer player, string mode = "cupboard", uint turretid=0)
         {
             CuiHelper.DestroyUi(player, TCGUP);
             Puts($"Building player select gui for mode {mode}...");
 
             // Create container, add top labels and buttons
-            CuiElementContainer container = UI.Container(TCGUP, UI.Color("242424", 1f), "0.2 0.15", "0.8 0.85", true, "Overlay");
-            UI.Label(ref container, TCGUP, UI.Color("#ffffff", 1f), Lang("tcguisel"), 18, "0.23 0.92", "0.7 1");
+            string description = Lang("tcguisel") + ": " + Lang(mode);
+            if(mode == "turret") description += $" {turretid.ToString()}";
+            CuiElementContainer container = UI.Container(TCGUP, UI.Color("242424", 1f), "0.15 0.1", "0.85 0.9", true, "Overlay");
+            UI.Label(ref container, TCGUP, UI.Color("#ffffff", 1f), description, 18, "0.23 0.92", "0.7 1");
             UI.Button(ref container, TCGUP, UI.Color("#d85540", 1f), Lang("close"), 12, "0.92 0.93", "0.985 0.98", $"tc guiselclose");
             int col = 1;
             int row = 1;
+            bool found = false;
 
             List<ulong> npcs = (List<ulong>)HumanNPC?.Call("HumanNPCs");
             foreach(BasePlayer user in BasePlayer.activePlayerList)
             {
                 if(npcs != null && npcs.Contains(user.userID)) continue;
+                if(user.userID == player.userID) continue;
+                found = true;
                 if(row > 9)
                 {
                     row = 1;
@@ -458,6 +398,7 @@ namespace Oxide.Plugins
             }
             foreach(BasePlayer user in BasePlayer.sleepingPlayerList)
             {
+                found = true;
                 if(npcs != null && npcs.Contains(user.userID)) continue;
                 if(row > 9)
                 {
@@ -474,6 +415,10 @@ namespace Oxide.Plugins
                     UI.Button(ref container, TCGUP, UI.Color("#555500", 1f), user.displayName, 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"tc add {user.userID} {user.displayName}");
                 }
                 row++;
+            }
+            if(!found)
+            {
+                UI.Label(ref container, TCGUP, UI.Color("#ffffff", 1f), Lang("none"), 12, "0.2 0.4", "0.7 1");
             }
 
             CuiHelper.AddUi(player, container);
