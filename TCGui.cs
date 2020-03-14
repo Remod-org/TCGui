@@ -24,9 +24,11 @@ namespace Oxide.Plugins
 
         const string TCGUI = "tcgui.editor";
         const string TCGUP = "tcgui.players";
+        const string TCGUB = "tcgui.button";
         private static TCGui ins;
         private Dictionary<string, string> onlinePlayers = new Dictionary<string, string>();
         private Dictionary<string, string> offlinePlayers = new Dictionary<string, string>();
+        private uint cuploot;
         #endregion
 
         #region Message
@@ -49,6 +51,7 @@ namespace Oxide.Plugins
                 ["helptext2"] = "  type /tc to do stuff",
                 ["close"] = "Close",
                 ["me"] = "Me",
+                ["manage"] = "Manage",
                 ["none"] = "None found!",
                 ["cupboard"] = "Cupboard",
                 ["turret"] = "Turret",
@@ -65,6 +68,28 @@ namespace Oxide.Plugins
             {
                 CuiHelper.DestroyUi(player, TCGUI);
                 CuiHelper.DestroyUi(player, TCGUP);
+                CuiHelper.DestroyUi(player, TCGUB);
+            }
+        }
+
+        private object CanLootEntity(BasePlayer player, StorageContainer container)
+        {
+            BuildingPrivlidge privs = container.GetComponentInParent<BuildingPrivlidge>();
+            if(privs == null) return null;
+            cuploot = privs.net.ID;
+            tcButtonGUI(player, privs);
+
+            return null;
+        }
+
+        void OnLootEntityEnd(BasePlayer player, BaseCombatEntity entity)
+        {
+            if(cuploot == 0) return;
+            if(entity == null) return;
+            if(entity.net.ID == cuploot)
+            {
+                CuiHelper.DestroyUi(player, TCGUB);
+                cuploot = 0;
             }
         }
         #endregion
@@ -110,9 +135,10 @@ namespace Oxide.Plugins
                     {
                         if(args[0] == "gui")
                         {
-#if DEBUG
-                            Puts("Opening gui...");
-#endif
+                            tcGUI(player, ent);
+                        }
+                        else if(args[0] == "guibtn")
+                        {
                             tcGUI(player, ent);
                         }
                         else if(args[0] == "guisel")
@@ -420,6 +446,16 @@ namespace Oxide.Plugins
             {
                 UI.Label(ref container, TCGUP, UI.Color("#ffffff", 1f), Lang("none"), 12, "0.2 0.4", "0.7 1");
             }
+
+            CuiHelper.AddUi(player, container);
+        }
+
+        void tcButtonGUI(BasePlayer player, BaseEntity entity)
+        {
+            CuiHelper.DestroyUi(player, TCGUB);
+
+            CuiElementContainer container = UI.Container(TCGUB, UI.Color("cccccc", 1f), "0.9 0.812", "0.946 0.835", true, "Overlay");
+            UI.Button(ref container, TCGUB, UI.Color("#333333", 1f), Lang("manage"), 10, "0 0", "1 1", $"tc guibtn");
 
             CuiHelper.AddUi(player, container);
         }
