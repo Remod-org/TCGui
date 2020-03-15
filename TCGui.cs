@@ -52,6 +52,7 @@ namespace Oxide.Plugins
                 ["close"] = "Close",
                 ["me"] = "Me",
                 ["manage"] = "Manage",
+                ["foundtc"] = "Found a TC.  Authorized players:",
                 ["none"] = "None found!",
                 ["cupboard"] = "Cupboard",
                 ["turret"] = "Turret",
@@ -212,7 +213,7 @@ namespace Oxide.Plugins
                     }
                     else
                     {
-                        Message(iplayer, "Found a TC:");
+                        Message(iplayer, "foundtc");
                         foreach(var auth in ent.authorizedPlayers.Select(x => x.userid).ToArray())
                         {
                             var theplayer = BasePlayer.Find(auth.ToString());
