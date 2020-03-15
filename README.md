@@ -18,5 +18,11 @@ There is currently no configuration required for TCGui.
 - `tcgui.use` -- Allows player to see the Manage button and use the GUI
 
 ## Chat Commands
+Most of this is only useful to and used by the GUI but could be used for scripting from other plugins or via RCON, perhaps...
 
-- `/tc` Parent function with help display
+- `/tc` - Parent function which will display the authorized players for the TC you're looking at.
+
+- `/tc add {player.userID} {player.displayName} - Add player to TC authorized list
+- `/tc remove {player.userID} - Remove player from TC authorized list
+- `/tc tadd {player.userID} {player.displayName} {turret.net.ID.ToString()} - Add player to turret authorized list
+- `/tc tremove {theplayer.userID} {turret.net.ID.ToString()} - Remove player from turret authorized list
