@@ -3,10 +3,13 @@
 
 [Download](https://code.remod.org/TCGui.cs)
 
-Provides a GUI to manage your tool cupboard and area autoturret authorization.  Also adds a button which appears above the TC loot window for accessing the GUI.
-
+Provides a GUI to manage your tool cupboard and area autoturret authorization.  Also adds a button which appears above the TC loot table for accessing the GUI.
 ![](https://i.imgur.com/XknT4uc.png)
+
+Click on Manage at the top of the TC Loot table for the GUI:
 ![](https://i.imgur.com/IvKZtYm.png)
+
+Once opened by clicking the button, you can select players to add to the TC or turret by clicking the associated Select button:
 ![](https://i.imgur.com/xf3kRgH.png)
 
 The user must be within range of the cupboard to access the GUI.  They must also be authorized to the cupboard.
