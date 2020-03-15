@@ -22,6 +22,7 @@ namespace Oxide.Plugins
         [PluginReference]
         Plugin HumanNPC;
 
+        private const string permTCGuiUse = "tcgui.use";
         const string TCGUI = "tcgui.editor";
         const string TCGUP = "tcgui.players";
         const string TCGUB = "tcgui.button";
@@ -40,8 +41,7 @@ namespace Oxide.Plugins
         void Init()
         {
             AddCovalenceCommand("tc", "cmdTCGUI");
-
-            permission.RegisterPermission("tcgui.use", this);
+            permission.RegisterPermission(permTCGuiUse, this);
 
             lang.RegisterMessages(new Dictionary<string, string>
             {
@@ -58,6 +58,8 @@ namespace Oxide.Plugins
                 ["turrets"] = "Turrets",
                 ["select"] = "Select",
                 ["add"] = "Add",
+                ["authall"] = "AuthAll",
+                ["deauthall"] = "DeAuthAll",
                 ["remove"] = "Remove"
             }, this);
         }
@@ -74,6 +76,7 @@ namespace Oxide.Plugins
 
         private object CanLootEntity(BasePlayer player, StorageContainer container)
         {
+            if(!player.IPlayer.HasPermission(permTCGuiUse)) return null;
             BuildingPrivlidge privs = container.GetComponentInParent<BuildingPrivlidge>();
             if(privs == null) return null;
             cuploot = privs.net.ID;
@@ -84,37 +87,24 @@ namespace Oxide.Plugins
 
         void OnLootEntityEnd(BasePlayer player, BaseCombatEntity entity)
         {
+            if(!player.IPlayer.HasPermission(permTCGuiUse)) return;
             if(cuploot == 0) return;
             if(entity == null) return;
             if(entity.net.ID == cuploot)
             {
+                CuiHelper.DestroyUi(player, TCGUI);
                 CuiHelper.DestroyUi(player, TCGUB);
+                CuiHelper.DestroyUi(player, TCGUP);
                 cuploot = 0;
             }
         }
         #endregion
 
         #region Main
-        bool GetRaycastTarget(BasePlayer player, out object closestEntity)
-        {
-            Puts($"Trying to find target TC for {player.displayName}");
-            closestEntity = false;
-
-            RaycastHit hit;
-            if(Physics.Raycast(player.eyes.HeadRay(), out hit, 3f))
-            {
-                closestEntity = hit.GetEntity();
-#if DEBUG
-                Puts($"Found entity {(closestEntity as BaseEntity).ShortPrefabName}");
-#endif
-                return true;
-            }
-            return false;
-        }
-
         [Command("tc")]
         void cmdTCGUI(IPlayer iplayer, string command, string[] args)
         {
+            if(!iplayer.HasPermission(permTCGuiUse)) return;
             var player = iplayer.Object as BasePlayer;
             if(args.Length > 0)
             {
@@ -124,12 +114,11 @@ namespace Oxide.Plugins
                 }
             }
 
-            object target;
-            if(GetRaycastTarget(player, out target))
-            {
-                var ent = target as BaseEntity;
-                string remplayer = null;
-                if(ent.ShortPrefabName.Contains("cupboard"))
+            List<BuildingPrivlidge> cupboards = new List<BuildingPrivlidge>();
+            Vis.Entities<BuildingPrivlidge>(player.transform.position, 3f, cupboards);
+			foreach(var ent in cupboards)
+			{
+				if(ent.IsAuthed(player))
                 {
                     if(args.Length > 0)
                     {
@@ -164,14 +153,13 @@ namespace Oxide.Plugins
 #endif
                             CuiHelper.DestroyUi(player, TCGUP);
                             // tc remove 7656XXXXXXXXXXXX
-                            BuildingPrivlidge privs = ent.GetComponentInParent<BuildingPrivlidge>();
 
-                            foreach (var p in privs.authorizedPlayers.ToArray ())
+                            foreach (var p in ent.authorizedPlayers.ToArray())
                             {
                                 if (p.userid == ulong.Parse(args[1]))
                                 {
-                                    privs.authorizedPlayers.Remove(p);
-                                    privs.SendNetworkUpdate(BasePlayer.NetworkQueue.Update);
+                                    ent.authorizedPlayers.Remove(p);
+                                    ent.SendNetworkUpdate(BasePlayer.NetworkQueue.Update);
                                 }
                             }
                             tcGUI(player, ent);
@@ -183,14 +171,12 @@ namespace Oxide.Plugins
 #endif
                             CuiHelper.DestroyUi(player, TCGUP);
                             // tc add 7656XXXXXXXXXXXX RFC1920
-                            BuildingPrivlidge privs = ent.GetComponentInParent<BuildingPrivlidge>();
-
-                            privs.authorizedPlayers.Add(new ProtoBuf.PlayerNameID()
+                            ent.authorizedPlayers.Add(new ProtoBuf.PlayerNameID()
                             {
                                 userid = ulong.Parse(args[1]),
                                 username = args[2]
                             });
-                            privs.SendNetworkUpdate(BasePlayer.NetworkQueue.Update);
+                            ent.SendNetworkUpdate(BasePlayer.NetworkQueue.Update);
                             tcGUI(player, ent);
                         }
                         else if(args[0] == "tremove" && args.Length > 2)
@@ -227,21 +213,15 @@ namespace Oxide.Plugins
                     else
                     {
                         Message(iplayer, "Found a TC:");
-                        BuildingPrivlidge privs = ent.GetComponentInParent<BuildingPrivlidge>();
-
-                        foreach(var auth in privs.authorizedPlayers.Select(x => x.userid).ToArray())
+                        foreach(var auth in ent.authorizedPlayers.Select(x => x.userid).ToArray())
                         {
                             var theplayer = BasePlayer.Find(auth.ToString());
                             Message(iplayer, theplayer.displayName);
                         }
                     }
                 }
+				break;
             }
-        }
-
-        BuildingPrivlidge GetBP(BaseEntity entity)
-        {
-            return entity.GetComponentInParent<BuildingPrivlidge>();
         }
 
         List<AutoTurret> GetTurrets(Vector3 location, float range = 30f)
@@ -255,21 +235,31 @@ namespace Oxide.Plugins
         {
             var players = new HashSet<BasePlayer>();
             if (string.IsNullOrEmpty(nameOrIdOrIp)) return players;
-            foreach (var activePlayer in BasePlayer.activePlayerList)
+            foreach(var activePlayer in BasePlayer.activePlayerList)
             {
-                if (activePlayer.UserIDString.Equals(nameOrIdOrIp))
+                if(activePlayer.UserIDString.Equals(nameOrIdOrIp))
+                {
                     players.Add(activePlayer);
-                else if (!string.IsNullOrEmpty(activePlayer.displayName) && activePlayer.displayName.Contains(nameOrIdOrIp, CompareOptions.IgnoreCase))
+                }
+                else if(!string.IsNullOrEmpty(activePlayer.displayName) && activePlayer.displayName.Contains(nameOrIdOrIp, CompareOptions.IgnoreCase))
+                {
                     players.Add(activePlayer);
-                else if (activePlayer.net?.connection != null && activePlayer.net.connection.ipaddress.Equals(nameOrIdOrIp))
+                }
+                else if(activePlayer.net?.connection != null && activePlayer.net.connection.ipaddress.Equals(nameOrIdOrIp))
+                {
                     players.Add(activePlayer);
+                }
             }
-            foreach (var sleepingPlayer in BasePlayer.sleepingPlayerList)
+            foreach(var sleepingPlayer in BasePlayer.sleepingPlayerList)
             {
-                if (sleepingPlayer.UserIDString.Equals(nameOrIdOrIp))
+                if(sleepingPlayer.UserIDString.Equals(nameOrIdOrIp))
+                {
                     players.Add(sleepingPlayer);
-                else if (!string.IsNullOrEmpty(sleepingPlayer.displayName) && sleepingPlayer.displayName.Contains(nameOrIdOrIp, CompareOptions.IgnoreCase))
+                }
+                else if(!string.IsNullOrEmpty(sleepingPlayer.displayName) && sleepingPlayer.displayName.Contains(nameOrIdOrIp, CompareOptions.IgnoreCase))
+                {
                     players.Add(sleepingPlayer);
+                }
             }
             return players;
         }
@@ -278,7 +268,6 @@ namespace Oxide.Plugins
         {
             CuiHelper.DestroyUi(player, TCGUI);
 
-            // Create container, add top labels and buttons
             CuiElementContainer container = UI.Container(TCGUI, UI.Color("2b2b2b", 0.9f), "0.15 0.1", "0.85 0.9", true, "Overlay");
             UI.Button(ref container, TCGUI, UI.Color("#d85540", 1f), Lang("close"), 12, "0.92 0.93", "0.985 0.98", $"tc guiclose");
             UI.Label(ref container, TCGUI, UI.Color("#ffffff", 1f), Lang("tcgui"), 18, "0.23 0.92", "0.7 1");
@@ -302,7 +291,7 @@ namespace Oxide.Plugins
 
             if(authed)
             {
-                UI.Button(ref container, TCGUI, UI.Color("#d85540", 1f), Lang("remove"), 12, $"{b[0]} {b[1]}", $"{b[0] + ((b[2] - b[0]) / 2)} {b[3]}", $"tc remove {player.userID}");
+                UI.Button(ref container, TCGUI, UI.Color("#ff0000", 1f), Lang("remove"), 12, $"{b[0]} {b[1]}", $"{b[0] + ((b[2] - b[0]) / 2)} {b[3]}", $"tc remove {player.userID}");
             }
             else
             {
@@ -355,7 +344,7 @@ namespace Oxide.Plugins
                     var findme = BasePlayer.Find(auth.ToString());
                     if(findme.userID == player.userID) authed = true;
                 }
-    
+
                 if(authed)
                 {
                     UI.Button(ref container, TCGUI, UI.Color("#d85540", 1f), Lang("remove"), 12, $"{b[0]} {b[1]}", $"{b[0] + ((b[2] - b[0]) / 2)} {b[3]}", $"tc tremove {player.userID} {turret.net.ID.ToString()}");
@@ -375,7 +364,6 @@ namespace Oxide.Plugins
                     float[] posb = GetButtonPosition(nc, 6);
                     UI.Label(ref container, TCGUI, UI.Color("#ffffff", 1f), theplayer.displayName, 12, $"{posn[0]} {posn[1]}", $"{posn[0] + ((posn[2] - posn[0]) / 2)} {posn[3]}", TextAnchor.MiddleLeft);
                     UI.Button(ref container, TCGUI, UI.Color("#d85540", 1f), Lang("remove"), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"tc tremove {theplayer.userID} {turret.net.ID.ToString()}");
-                    // NOT SHOWING :(
                 }
                 nc++;
                 poss = GetButtonPosition(nc, 6);
@@ -388,30 +376,49 @@ namespace Oxide.Plugins
         void PlayerSelectGUI(BasePlayer player, string mode = "cupboard", uint turretid=0)
         {
             CuiHelper.DestroyUi(player, TCGUP);
-            Puts($"Building player select gui for mode {mode}...");
 
-            // Create container, add top labels and buttons
             string description = Lang("tcguisel") + ": " + Lang(mode);
             if(mode == "turret") description += $" {turretid.ToString()}";
             CuiElementContainer container = UI.Container(TCGUP, UI.Color("242424", 1f), "0.15 0.1", "0.85 0.9", true, "Overlay");
             UI.Label(ref container, TCGUP, UI.Color("#ffffff", 1f), description, 18, "0.23 0.92", "0.7 1");
             UI.Button(ref container, TCGUP, UI.Color("#d85540", 1f), Lang("close"), 12, "0.92 0.93", "0.985 0.98", $"tc guiselclose");
-            int col = 1;
-            int row = 1;
+            int col = 0;
+            int row = 0;
             bool found = false;
 
+#if DEBUG
             List<ulong> npcs = (List<ulong>)HumanNPC?.Call("HumanNPCs");
-            foreach(BasePlayer user in BasePlayer.activePlayerList)
-            {
-                if(npcs != null && npcs.Contains(user.userID)) continue;
-                if(user.userID == player.userID) continue;
+			foreach(ulong npc in npcs)
+			{
                 found = true;
-                if(row > 9)
+                if(row > 13)
                 {
-                    row = 1;
+                    row = 0;
                     col++;
                 }
-                float[] posb = GetButtonPosition(row, col);
+                float[] posb = GetButtonPositionP(row, col);
+                var hName = (string)HumanNPC?.Call("HumanNPCname", npc);
+                if(mode == "turret" && turretid > 0)
+                {
+                    UI.Button(ref container, TCGUP, UI.Color("#d85540", 1f), hName, 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"tc Btadd {npc.ToString()} {turretid.ToString()}");
+                }
+                else
+                {
+                    UI.Button(ref container, TCGUP, UI.Color("#d85540", 1f), hName, 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"tc Badd {npc.ToString()} {hName}");
+                }
+                row++;
+			}
+#endif
+            foreach(BasePlayer user in BasePlayer.activePlayerList)
+            {
+                if(user.userID == player.userID) continue;
+                found = true;
+                if(row > 13)
+                {
+                    row = 0;
+                    col++;
+                }
+                float[] posb = GetButtonPositionP(row, col);
                 if(mode == "turret" && turretid > 0)
                 {
                     UI.Button(ref container, TCGUP, UI.Color("#d85540", 1f), user.displayName, 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"tc tadd {user.userID} {turretid.ToString()}");
@@ -425,13 +432,12 @@ namespace Oxide.Plugins
             foreach(BasePlayer user in BasePlayer.sleepingPlayerList)
             {
                 found = true;
-                if(npcs != null && npcs.Contains(user.userID)) continue;
-                if(row > 9)
+                if(row > 13)
                 {
-                    row = 1;
+                    row = 0;
                     col++;
                 }
-                float[] posb = GetButtonPosition(row, col);
+                float[] posb = GetButtonPositionP(row, col);
                 if(mode == "turret" && turretid > 0)
                 {
                     UI.Button(ref container, TCGUP, UI.Color("#555500", 1f), user.displayName, 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"tc tadd {user.userID} {turretid.ToString()}");
@@ -455,7 +461,7 @@ namespace Oxide.Plugins
             CuiHelper.DestroyUi(player, TCGUB);
 
             CuiElementContainer container = UI.Container(TCGUB, UI.Color("cccccc", 1f), "0.9 0.812", "0.946 0.835", true, "Overlay");
-            UI.Button(ref container, TCGUB, UI.Color("#333333", 1f), Lang("manage"), 10, "0 0", "1 1", $"tc guibtn");
+            UI.Button(ref container, TCGUB, UI.Color("#424242", 1f), Lang("manage"), 12, "0 0", "1 1", $"tc guibtn");
 
             CuiHelper.AddUi(player, container);
         }
@@ -467,6 +473,13 @@ namespace Oxide.Plugins
             float offsetY = (0.80f - (rowNumber * 0.064f));
 
             return new float[] { offsetX, offsetY, offsetX + 0.196f, offsetY + 0.03f };
+        }
+        private float[] GetButtonPositionP(int rowNumber, int columnNumber)
+        {
+            float offsetX = 0.05f + (0.126f * columnNumber);
+            float offsetY = (0.87f - (rowNumber * 0.064f));
+
+            return new float[] { offsetX, offsetY, offsetX + 0.226f, offsetY + 0.03f };
         }
         #endregion
 
