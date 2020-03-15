@@ -22,7 +22,7 @@ Most of this is only useful to and used by the GUI but could be used for scripti
 
 - `/tc` - Parent function which will display the authorized players for the TC you're looking at.
 
-- `/tc add {player.userID} {player.displayName} - Add player to TC authorized list
-- `/tc remove {player.userID} - Remove player from TC authorized list
-- `/tc tadd {player.userID} {player.displayName} {turret.net.ID.ToString()} - Add player to turret authorized list
-- `/tc tremove {theplayer.userID} {turret.net.ID.ToString()} - Remove player from turret authorized list
+- `/tc add {player.userID} {player.displayName}` - Add player to TC authorized list
+- `/tc remove {player.userID}` - Remove player from TC authorized list
+- `/tc tadd {player.userID} {player.displayName} {turret.net.ID.ToString()}` - Add player to turret authorized list
+- `/tc tremove {theplayer.userID} {turret.net.ID.ToString()}` - Remove player from turret authorized list
