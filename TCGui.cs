@@ -60,6 +60,8 @@ namespace Oxide.Plugins
                 ["select"] = "Select",
                 ["add"] = "Add",
                 ["authall"] = "AuthAll",
+                ["online"] = "Online",
+                ["offline"] = "Offline",
                 ["deauthall"] = "DeAuthAll",
                 ["remove"] = "Remove"
             }, this);
@@ -380,8 +382,10 @@ namespace Oxide.Plugins
 
             string description = Lang("tcguisel") + ": " + Lang(mode);
             if(mode == "turret") description += $" {turretid.ToString()}";
-            CuiElementContainer container = UI.Container(TCGUP, UI.Color("242424", 1f), "0.15 0.1", "0.85 0.9", true, "Overlay");
+            CuiElementContainer container = UI.Container(TCGUP, UI.Color("242424", 1f), "0.1 0.1", "0.9 0.9", true, "Overlay");
             UI.Label(ref container, TCGUP, UI.Color("#ffffff", 1f), description, 18, "0.23 0.92", "0.7 1");
+            UI.Label(ref container, TCGUP, UI.Color("#d85540", 1f), Lang("online"), 12, "0.72 0.92", "0.77 1");
+            UI.Label(ref container, TCGUP, UI.Color("#555500", 1f), Lang("offline"), 12, "0.79 0.92", "0.86 1");
             UI.Button(ref container, TCGUP, UI.Color("#d85540", 1f), Lang("close"), 12, "0.92 0.93", "0.985 0.98", $"tc guiselclose");
             int col = 0;
             int row = 0;
