@@ -14,7 +14,7 @@ using System.Diagnostics;
 
 namespace Oxide.Plugins
 {
-    [Info("Tool Cupboard GUI", "RFC1920", "1.0.1")]
+    [Info("Tool Cupboard GUI", "RFC1920", "1.0.2")]
     [Description("Manage TC and Turret auth")]
     class TCGui : RustPlugin
     {
@@ -29,7 +29,8 @@ namespace Oxide.Plugins
         private static TCGui ins;
         private Dictionary<string, string> onlinePlayers = new Dictionary<string, string>();
         private Dictionary<string, string> offlinePlayers = new Dictionary<string, string>();
-        private uint cuploot;
+        // Dict of TC net ID and player id for currently opened cupboards
+        private Dictionary<uint, ulong> cuploot = new Dictionary<uint, ulong>();
         #endregion
 
         #region Message
@@ -80,9 +81,10 @@ namespace Oxide.Plugins
         private object CanLootEntity(BasePlayer player, StorageContainer container)
         {
             if(!player.IPlayer.HasPermission(permTCGuiUse)) return null;
-            BuildingPrivlidge privs = container.GetComponentInParent<BuildingPrivlidge>();
+            var privs = container.GetComponentInParent<BuildingPrivlidge>() ?? null;
             if(privs == null) return null;
-            cuploot = privs.net.ID;
+
+            cuploot.Add(privs.net.ID, player.userID);
             tcButtonGUI(player, privs);
 
             return null;
@@ -91,14 +93,15 @@ namespace Oxide.Plugins
         void OnLootEntityEnd(BasePlayer player, BaseCombatEntity entity)
         {
             if(!player.IPlayer.HasPermission(permTCGuiUse)) return;
-            if(cuploot == 0) return;
+            if(!cuploot.ContainsKey(entity.net.ID)) return;
             if(entity == null) return;
-            if(entity.net.ID == cuploot)
+
+            if(cuploot[entity.net.ID] == player.userID)
             {
                 CuiHelper.DestroyUi(player, TCGUI);
                 CuiHelper.DestroyUi(player, TCGUB);
                 CuiHelper.DestroyUi(player, TCGUP);
-                cuploot = 0;
+                cuploot.Remove(entity.net.ID);
             }
         }
         #endregion
@@ -119,9 +122,9 @@ namespace Oxide.Plugins
 
             List<BuildingPrivlidge> cupboards = new List<BuildingPrivlidge>();
             Vis.Entities<BuildingPrivlidge>(player.transform.position, 3f, cupboards);
-			foreach(var ent in cupboards)
-			{
-				if(ent.IsAuthed(player))
+            foreach(var ent in cupboards)
+            {
+                if(ent.IsAuthed(player))
                 {
                     if(args.Length > 0)
                     {
@@ -223,7 +226,7 @@ namespace Oxide.Plugins
                         }
                     }
                 }
-				break;
+                break;
             }
         }
 
@@ -269,6 +272,8 @@ namespace Oxide.Plugins
 
         void tcGUI(BasePlayer player, BaseEntity entity)
         {
+            if(player == null) return;
+            if(entity == null) return;
             CuiHelper.DestroyUi(player, TCGUI);
 
             CuiElementContainer container = UI.Container(TCGUI, UI.Color("2b2b2b", 0.9f), "0.15 0.1", "0.85 0.9", true, "Overlay");
@@ -393,8 +398,8 @@ namespace Oxide.Plugins
 
 #if DEBUG
             List<ulong> npcs = (List<ulong>)HumanNPC?.Call("HumanNPCs");
-			foreach(ulong npc in npcs)
-			{
+            foreach(ulong npc in npcs)
+            {
                 found = true;
                 if(row > 13)
                 {
@@ -412,7 +417,7 @@ namespace Oxide.Plugins
                     UI.Button(ref container, TCGUP, UI.Color("#d85540", 1f), hName, 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"tc Badd {npc.ToString()} {hName}");
                 }
                 row++;
-			}
+            }
 #endif
             foreach(BasePlayer user in BasePlayer.activePlayerList)
             {
