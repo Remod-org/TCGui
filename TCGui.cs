@@ -14,7 +14,7 @@ using System.Diagnostics;
 
 namespace Oxide.Plugins
 {
-    [Info("Tool Cupboard GUI", "RFC1920", "1.0.4")]
+    [Info("Tool Cupboard GUI", "RFC1920", "1.0.5")]
     [Description("Manage TC and Turret auth")]
     class TCGui : RustPlugin
     {
@@ -84,11 +84,8 @@ namespace Oxide.Plugins
             var privs = container.GetComponentInParent<BuildingPrivlidge>() ?? null;
             if(privs == null) return null;
 
-            try
-            {
-                if(cuploot[privs.net.ID] != null) return null;
-            }
-            catch {}
+            if(cuploot.ContainsKey(privs.net.ID)) return null;
+
             cuploot.Add(privs.net.ID, player.userID);
             tcButtonGUI(player, privs);
 
