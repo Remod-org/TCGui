@@ -14,7 +14,7 @@ using System.Diagnostics;
 
 namespace Oxide.Plugins
 {
-    [Info("Tool Cupboard GUI", "RFC1920", "1.0.5")]
+    [Info("Tool Cupboard GUI", "RFC1920", "1.0.6")]
     [Description("Manage TC and Turret auth")]
     class TCGui : RustPlugin
     {
@@ -31,6 +31,8 @@ namespace Oxide.Plugins
         private Dictionary<string, string> offlinePlayers = new Dictionary<string, string>();
         // Dict of TC net ID and player id for currently opened cupboards
         private Dictionary<uint, ulong> cuploot = new Dictionary<uint, ulong>();
+        private string tcurl = "http://vignette2.wikia.nocookie.net/play-rust/images/5/57/Tool_Cupboard_icon.png/revision/latest/scale-to-width-down/{0}";
+        private string trurl = "http://vignette2.wikia.nocookie.net/play-rust/images/f/f9/Auto_Turret_icon.png/revision/latest/scale-to-width-down/{0}";
         #endregion
 
         #region Message
@@ -278,11 +280,16 @@ namespace Oxide.Plugins
             if(entity == null) return;
             CuiHelper.DestroyUi(player, TCGUI);
 
-            CuiElementContainer container = UI.Container(TCGUI, UI.Color("2b2b2b", 0.9f), "0.15 0.1", "0.85 0.9", true, "Overlay");
+            CuiElementContainer container = UI.Container(TCGUI, UI.Color("2b2b2b", 1f), "0.15 0.1", "0.85 0.9", true, "Overlay");
             UI.Button(ref container, TCGUI, UI.Color("#d85540", 1f), Lang("close"), 12, "0.92 0.93", "0.985 0.98", $"tc guiclose");
             UI.Label(ref container, TCGUI, UI.Color("#ffffff", 1f), Lang("tcgui"), 18, "0.23 0.92", "0.7 1");
+
+            UI.Icon(ref container, TCGUI, UI.Color("#ffffff", 1f), string.Format(tcurl, 140), "0.1 0.83", "0.15 0.9");
             UI.Label(ref container, TCGUI, UI.Color("#ffffff", 1f), Lang("cupboard"), 14, "0.15 0.83", "0.28 0.9");
-            UI.Label(ref container, TCGUI, UI.Color("#ffffff", 1f), Lang("turrets"), 14, "0.3 0.83", "0.8 0.9");
+
+            UI.Icon(ref container, TCGUI, UI.Color("#ffffff", 1f), string.Format(trurl, 140), "0.49 0.83", "0.54 0.9");
+            UI.Label(ref container, TCGUI, UI.Color("#ffffff", 1f), Lang("turrets"), 14, "0.5 0.83", "0.7 0.9");
+
 
             int nc = 0;
             float[] n = GetButtonPosition(nc, 1);
@@ -565,6 +572,28 @@ namespace Oxide.Plugins
                         },
                         new CuiRectTransformComponent { AnchorMin = min, AnchorMax = max },
                         new CuiNeedsCursorComponent()
+                    }
+                });
+            }
+            public static void Icon(ref CuiElementContainer container, string panel, string color, string imageurl, string min, string max)
+            {
+                container.Add(new CuiElement
+                {
+                    Name = CuiHelper.GetGuid(),
+                    Parent = panel,
+                    Components =
+                    {
+                        new CuiRawImageComponent
+                        {
+                            Url = imageurl,
+                            Sprite = "assets/content/textures/generic/fulltransparent.tga",
+                            Color = color
+                        },
+                        new CuiRectTransformComponent
+                        {
+                            AnchorMin = min,
+                            AnchorMax = max
+                        }
                     }
                 });
             }
