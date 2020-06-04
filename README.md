@@ -1,7 +1,5 @@
 # TCGui
-# Tool Cupboard GUI for Rust (Remod original)
-
-[Download](https://code.remod.org/TCGui.cs)
+## Tool Cupboard GUI for Rust (Remod original)
 
 Provides a GUI to manage your tool cupboard and area autoturret authorization.  Also adds a button which appears above the TC loot table for accessing the GUI.
 
@@ -17,9 +15,25 @@ Once opened by clicking the button, you can remove players by clicking the Remov
 
 The user must be within range of the cupboard to access the GUI.  They must also be authorized to the cupboard.
 
-There is currently no configuration required for TCGui.
+### Configuration
+```json
+{
+  "Settings": {
+    "cupboardRange": 3.0,
+    "turretRange": 30.0
+  },
+  "Version": {
+    "Major": 1,
+    "Minor": 0,
+    "Patch": 7
+  }
+}
+```
 
-## Permissions
+- `cupboardRange` -- Sets the minimum distance for interacting with a cupboard.  3f was the original default.  5f might work better for you.  Don't set it too high or you may see overlap and odd behavior.
+- `turretRange` -- Sets the maximum distance from a cupboard to locate turrets.  30f is the default, which should be close to actual cupboard protection range.  You can adjust higher as needed if the plugin fails to find your local turrets.
+
+### Permissions
 
 - `tcgui.use` -- Allows player to see the Manage button and use the GUI
 

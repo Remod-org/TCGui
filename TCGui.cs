@@ -1,38 +1,58 @@
+#region License (GPL v3)
+/*
+    DESCRIPTION
+    Copyright (c) 2020 RFC1920 <desolationoutpostpve@gmail.com>
+
+    This program is free software; you can redistribute it and/or
+    modify it under the terms of the GNU General Public License
+    as published by the Free Software Foundation; either version 2
+    of the License, or (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program; if not, write to the Free Software
+    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+
+    Optionally you can also view the license at <http://www.gnu.org/licenses/>.
+*/
+#endregion License Information (GPL v3)
 //#define DEBUG
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using Oxide.Core;
-using Oxide.Core.Configuration;
 using Oxide.Core.Libraries.Covalence;
 using Oxide.Game.Rust.Cui;
 using Oxide.Core.Plugins;
 using UnityEngine;
 using System.Linq;
-using System.Diagnostics;
 
 namespace Oxide.Plugins
 {
-    [Info("Tool Cupboard GUI", "RFC1920", "1.0.6")]
+    [Info("Tool Cupboard GUI", "RFC1920", "1.0.7")]
     [Description("Manage TC and Turret auth")]
     class TCGui : RustPlugin
     {
         #region vars
         [PluginReference]
-        Plugin HumanNPC;
+        readonly Plugin HumanNPC;
 
+        private ConfigData configData;
         private const string permTCGuiUse = "tcgui.use";
         const string TCGUI = "tcgui.editor";
         const string TCGUP = "tcgui.players";
         const string TCGUB = "tcgui.button";
-        private static TCGui ins;
-        private Dictionary<string, string> onlinePlayers = new Dictionary<string, string>();
-        private Dictionary<string, string> offlinePlayers = new Dictionary<string, string>();
+
+        private readonly Dictionary<string, string> onlinePlayers = new Dictionary<string, string>();
+        private readonly Dictionary<string, string> offlinePlayers = new Dictionary<string, string>();
         // Dict of TC net ID and player id for currently opened cupboards
         private Dictionary<uint, ulong> cuploot = new Dictionary<uint, ulong>();
-        private string tcurl = "http://vignette2.wikia.nocookie.net/play-rust/images/5/57/Tool_Cupboard_icon.png/revision/latest/scale-to-width-down/{0}";
-        private string trurl = "http://vignette2.wikia.nocookie.net/play-rust/images/f/f9/Auto_Turret_icon.png/revision/latest/scale-to-width-down/{0}";
+        private readonly string tcurl = "http://vignette2.wikia.nocookie.net/play-rust/images/5/57/Tool_Cupboard_icon.png/revision/latest/scale-to-width-down/{0}";
+        private readonly string trurl = "http://vignette2.wikia.nocookie.net/play-rust/images/f/f9/Auto_Turret_icon.png/revision/latest/scale-to-width-down/{0}";
         #endregion
 
         #region Message
@@ -43,7 +63,7 @@ namespace Oxide.Plugins
         #region init
         void Init()
         {
-            AddCovalenceCommand("tc", "cmdTCGUI");
+            AddCovalenceCommand("tc", "CmdTCGUI");
             permission.RegisterPermission(permTCGuiUse, this);
 
             lang.RegisterMessages(new Dictionary<string, string>
@@ -70,6 +90,8 @@ namespace Oxide.Plugins
             }, this);
         }
 
+        void Loaded() => LoadConfigValues();
+
         void Unload()
         {
             foreach(BasePlayer player in BasePlayer.activePlayerList)
@@ -89,7 +111,7 @@ namespace Oxide.Plugins
             if(cuploot.ContainsKey(privs.net.ID)) return null;
 
             cuploot.Add(privs.net.ID, player.userID);
-            tcButtonGUI(player, privs);
+            TcButtonGUI(player, privs);
 
             return null;
         }
@@ -112,9 +134,12 @@ namespace Oxide.Plugins
 
         #region Main
         [Command("tc")]
-        void cmdTCGUI(IPlayer iplayer, string command, string[] args)
+        void CmdTCGUI(IPlayer iplayer, string command, string[] args)
         {
             if(!iplayer.HasPermission(permTCGuiUse)) return;
+#if DEBUG
+            string debug = string.Join(",", args); Puts($"{debug}");
+#endif
             var player = iplayer.Object as BasePlayer;
             if(args.Length > 0)
             {
@@ -125,7 +150,7 @@ namespace Oxide.Plugins
             }
 
             List<BuildingPrivlidge> cupboards = new List<BuildingPrivlidge>();
-            Vis.Entities<BuildingPrivlidge>(player.transform.position, 3f, cupboards);
+            Vis.Entities<BuildingPrivlidge>(player.transform.position, configData.Settings.cupboardRange, cupboards);
             foreach(var ent in cupboards)
             {
                 if(ent.IsAuthed(player))
@@ -134,11 +159,11 @@ namespace Oxide.Plugins
                     {
                         if(args[0] == "gui")
                         {
-                            tcGUI(player, ent);
+                            TcGUI(player, ent);
                         }
                         else if(args[0] == "guibtn")
                         {
-                            tcGUI(player, ent);
+                            TcGUI(player, ent);
                         }
                         else if(args[0] == "guisel")
                         {
@@ -172,7 +197,7 @@ namespace Oxide.Plugins
                                     ent.SendNetworkUpdate(BasePlayer.NetworkQueue.Update);
                                 }
                             }
-                            tcGUI(player, ent);
+                            TcGUI(player, ent);
                         }
                         else if(args[0] == "add" && args.Length > 2)
                         {
@@ -181,13 +206,24 @@ namespace Oxide.Plugins
 #endif
                             CuiHelper.DestroyUi(player, TCGUP);
                             // tc add 7656XXXXXXXXXXXX RFC1920
-                            ent.authorizedPlayers.Add(new ProtoBuf.PlayerNameID()
+                            bool exists = false;
+                            foreach (var p in ent.authorizedPlayers.ToArray())
                             {
-                                userid = ulong.Parse(args[1]),
-                                username = args[2]
-                            });
-                            ent.SendNetworkUpdate(BasePlayer.NetworkQueue.Update);
-                            tcGUI(player, ent);
+                                if (p.userid == ulong.Parse(args[1]))
+                                {
+                                    exists = true;
+                                }
+                            }
+                            if (!exists)
+                            {
+                                ent.authorizedPlayers.Add(new ProtoBuf.PlayerNameID()
+                                {
+                                    userid = ulong.Parse(args[1]),
+                                    username = args[2]
+                                });
+                                ent.SendNetworkUpdate(BasePlayer.NetworkQueue.Update);
+                            }
+                            TcGUI(player, ent);
                         }
                         else if(args[0] == "tremove" && args.Length > 2)
                         {
@@ -203,7 +239,7 @@ namespace Oxide.Plugins
                                     turret.SendNetworkUpdate(BasePlayer.NetworkQueue.Update);
                                 }
                             }
-                            tcGUI(player, ent);
+                            TcGUI(player, ent);
                         }
                         else if(args[0] == "tadd" && args.Length > 3)
                         {
@@ -217,7 +253,7 @@ namespace Oxide.Plugins
                                 username = args[2]
                             });
                             turret.SendNetworkUpdate(BasePlayer.NetworkQueue.Update);
-                            tcGUI(player, ent);
+                            TcGUI(player, ent);
                         }
                     }
                     else
@@ -274,10 +310,10 @@ namespace Oxide.Plugins
             return players;
         }
 
-        void tcGUI(BasePlayer player, BaseEntity entity)
+        void TcGUI(BasePlayer player, BuildingPrivlidge privs)
         {
-            if(player == null) return;
-            if(entity == null) return;
+            if (player == null) return;
+            if (privs == null) return;
             CuiHelper.DestroyUi(player, TCGUI);
 
             CuiElementContainer container = UI.Container(TCGUI, UI.Color("2b2b2b", 1f), "0.15 0.1", "0.85 0.9", true, "Overlay");
@@ -290,14 +326,12 @@ namespace Oxide.Plugins
             UI.Icon(ref container, TCGUI, UI.Color("#ffffff", 1f), string.Format(trurl, 140), "0.49 0.83", "0.54 0.9");
             UI.Label(ref container, TCGUI, UI.Color("#ffffff", 1f), Lang("turrets"), 14, "0.5 0.83", "0.7 0.9");
 
-
             int nc = 0;
             float[] n = GetButtonPosition(nc, 1);
             float[] b = GetButtonPosition(nc, 2);
             UI.Label(ref container, TCGUI, UI.Color("#ffffff", 1f), Lang("me"), 12, $"{n[0]} {n[1]}", $"{n[0] + ((n[2] - n[0]) / 2)} {n[3]}", TextAnchor.MiddleLeft);
             bool authed = false;
 
-            BuildingPrivlidge privs = entity.GetComponentInParent<BuildingPrivlidge>();
             foreach(var auth in privs.authorizedPlayers.Select(x => x.userid).ToArray())
             {
                 var findme = BasePlayer.Find(auth.ToString());
@@ -338,7 +372,7 @@ namespace Oxide.Plugins
             float[] poss = GetButtonPosition(nc, 2);
             UI.Button(ref container, TCGUI, UI.Color("115540", 1f), Lang("select"), 12, $"{poss[0]} {poss[1]}", $"{poss[0] + ((poss[2] - poss[0]) / 2)} {poss[3]}", $"tc guisel");
 
-            List<AutoTurret> turrets = GetTurrets(player.transform.position, 30f);
+            List<AutoTurret> turrets = GetTurrets(player.transform.position, configData.Settings.turretRange);
             List<ulong> foundturrets = new List<ulong>();
 
             nc = -1;
@@ -475,7 +509,7 @@ namespace Oxide.Plugins
             CuiHelper.AddUi(player, container);
         }
 
-        void tcButtonGUI(BasePlayer player, BaseEntity entity)
+        void TcButtonGUI(BasePlayer player, BaseEntity entity)
         {
             CuiHelper.DestroyUi(player, TCGUB);
 
@@ -608,6 +642,35 @@ namespace Oxide.Plugins
                 int blue = int.Parse(hexColor.Substring(4, 2), NumberStyles.AllowHexSpecifier);
                 return $"{(double)red / 255} {(double)green / 255} {(double)blue / 255} {alpha}";
             }
+        }
+        #endregion
+
+        #region config
+        private class ConfigData
+        {
+            public Settings Settings = new Settings();
+            public VersionNumber Version;
+        }
+
+        private class Settings
+        {
+            public float cupboardRange = 3f;
+            public float turretRange = 30f;
+        }
+
+        protected override void LoadDefaultConfig() => Puts("New configuration file created.");
+
+        void LoadConfigValues()
+        {
+            configData = Config.ReadObject<ConfigData>();
+            configData.Version = Version;
+
+            SaveConfig(configData);
+        }
+
+        private void SaveConfig(ConfigData config)
+        {
+            Config.WriteObject(config, true);
         }
         #endregion
     }
