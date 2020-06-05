@@ -33,7 +33,7 @@ using System.Linq;
 
 namespace Oxide.Plugins
 {
-    [Info("Tool Cupboard GUI", "RFC1920", "1.0.7")]
+    [Info("Tool Cupboard GUI", "RFC1920", "1.0.8")]
     [Description("Manage TC and Turret auth")]
     class TCGui : RustPlugin
     {
@@ -231,12 +231,15 @@ namespace Oxide.Plugins
                             // tc tremove 7656XXXXXXXXXXXX TURRETID
                             var turret = BaseNetworkable.serverEntities.Find(uint.Parse(args[2])) as AutoTurret;
 
-                            foreach(var p in turret.authorizedPlayers.ToArray())
+                            if (turret != null)
                             {
-                                if(p.userid == ulong.Parse(args[1]))
+                                foreach (var p in turret.authorizedPlayers.ToArray())
                                 {
-                                    turret.authorizedPlayers.Remove(p);
-                                    turret.SendNetworkUpdate(BasePlayer.NetworkQueue.Update);
+                                    if (p.userid == ulong.Parse(args[1]))
+                                    {
+                                        turret.authorizedPlayers.Remove(p);
+                                        turret.SendNetworkUpdate(BasePlayer.NetworkQueue.Update);
+                                    }
                                 }
                             }
                             TcGUI(player, ent);
@@ -247,12 +250,15 @@ namespace Oxide.Plugins
                             // tc tadd 7656XXXXXXXXXXXX NAME TURRETID
                             var turret = BaseNetworkable.serverEntities.Find(uint.Parse(args[3])) as AutoTurret;
 
-                            turret.authorizedPlayers.Add(new ProtoBuf.PlayerNameID()
+                            if (turret != null)
                             {
-                                userid = ulong.Parse(args[1]),
-                                username = args[2]
-                            });
-                            turret.SendNetworkUpdate(BasePlayer.NetworkQueue.Update);
+                                turret.authorizedPlayers.Add(new ProtoBuf.PlayerNameID()
+                                {
+                                    userid = ulong.Parse(args[1]),
+                                    username = args[2]
+                                });
+                                turret.SendNetworkUpdate(BasePlayer.NetworkQueue.Update);
+                            }
                             TcGUI(player, ent);
                         }
                     }
@@ -453,11 +459,11 @@ namespace Oxide.Plugins
                 var hName = (string)HumanNPC?.Call("HumanNPCname", npc);
                 if(mode == "turret" && turretid > 0)
                 {
-                    UI.Button(ref container, TCGUP, UI.Color("#d85540", 1f), hName, 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"tc Btadd {npc.ToString()} {turretid.ToString()}");
+                    UI.Button(ref container, TCGUP, UI.Color("#d85540", 1f), hName, 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"tc tadd {npc.ToString()} {turretid.ToString()}");
                 }
                 else
                 {
-                    UI.Button(ref container, TCGUP, UI.Color("#d85540", 1f), hName, 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"tc Badd {npc.ToString()} {hName}");
+                    UI.Button(ref container, TCGUP, UI.Color("#d85540", 1f), hName, 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"tc add {npc.ToString()} {hName}");
                 }
                 row++;
             }
@@ -474,11 +480,11 @@ namespace Oxide.Plugins
                 float[] posb = GetButtonPositionP(row, col);
                 if(mode == "turret" && turretid > 0)
                 {
-                    UI.Button(ref container, TCGUP, UI.Color("#d85540", 1f), user.displayName, 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"tc tadd {user.userID} {user.displayName} {turretid.ToString()}");
+                    UI.Button(ref container, TCGUP, UI.Color("#d85540", 1f), user.displayName, 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"tc tadd {user.userID} {user.UserIDString} {turretid.ToString()}");
                 }
                 else
                 {
-                    UI.Button(ref container, TCGUP, UI.Color("#d85540", 1f), user.displayName, 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"tc add {user.userID} {user.displayName}");
+                    UI.Button(ref container, TCGUP, UI.Color("#d85540", 1f), user.displayName, 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"tc add {user.userID} {user.UserIDString}");
                 }
                 row++;
             }
@@ -493,11 +499,11 @@ namespace Oxide.Plugins
                 float[] posb = GetButtonPositionP(row, col);
                 if(mode == "turret" && turretid > 0)
                 {
-                    UI.Button(ref container, TCGUP, UI.Color("#555500", 1f), user.displayName, 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"tc tadd {user.userID} {user.displayName} {turretid.ToString()}");
+                    UI.Button(ref container, TCGUP, UI.Color("#555500", 1f), user.displayName, 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"tc tadd {user.userID} {user.UserIDString} {turretid.ToString()}");
                 }
                 else
                 {
-                    UI.Button(ref container, TCGUP, UI.Color("#555500", 1f), user.displayName, 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"tc add {user.userID} {user.displayName}");
+                    UI.Button(ref container, TCGUP, UI.Color("#555500", 1f), user.displayName, 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"tc add {user.userID} {user.UserIDString}");
                 }
                 row++;
             }
