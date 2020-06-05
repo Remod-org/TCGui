@@ -33,7 +33,7 @@ using System.Linq;
 
 namespace Oxide.Plugins
 {
-    [Info("Tool Cupboard GUI", "RFC1920", "1.0.8")]
+    [Info("Tool Cupboard GUI", "RFC1920", "1.0.9")]
     [Description("Manage TC and Turret auth")]
     class TCGui : RustPlugin
     {
@@ -499,7 +499,7 @@ namespace Oxide.Plugins
                 float[] posb = GetButtonPositionP(row, col);
                 if(mode == "turret" && turretid > 0)
                 {
-                    UI.Button(ref container, TCGUP, UI.Color("#555500", 1f), user.displayName, 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"tc tadd {user.userID} {user.UserIDString} {turretid.ToString()}");
+                    //UI.Button(ref container, TCGUP, UI.Color("#555500", 1f), user.displayName, 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"tc tadd {user.userID} {user.UserIDString} {turretid.ToString()}");
                 }
                 else
                 {
