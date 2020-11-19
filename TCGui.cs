@@ -33,7 +33,7 @@ using System.Linq;
 
 namespace Oxide.Plugins
 {
-    [Info("Tool Cupboard GUI", "RFC1920", "1.0.9")]
+    [Info("Tool Cupboard GUI", "RFC1920", "1.0.10")]
     [Description("Manage TC and Turret auth")]
     class TCGui : RustPlugin
     {
@@ -61,16 +61,20 @@ namespace Oxide.Plugins
         #endregion
 
         #region init
-        void Init()
+        private void Init()
         {
             AddCovalenceCommand("tc", "CmdTCGUI");
             permission.RegisterPermission(permTCGuiUse, this);
+        }
 
+        protected override void LoadDefaultMessages()
+        {
             lang.RegisterMessages(new Dictionary<string, string>
             {
                 ["tcgui"] = "Tool Cupboard GUI",
                 ["tcguisel"] = "Tool Cupboard GUI - Player Select",
                 ["helptext1"] = "Tool Cupboard GUI instructions:",
+                ["notauthorized"] = "You are not authorized for this command!",
                 ["helptext2"] = "  type /tc to do stuff",
                 ["close"] = "Close",
                 ["me"] = "Me",
@@ -90,9 +94,9 @@ namespace Oxide.Plugins
             }, this);
         }
 
-        void Loaded() => LoadConfigValues();
+        private void Loaded() => LoadConfigValues();
 
-        void Unload()
+        private void Unload()
         {
             foreach(BasePlayer player in BasePlayer.activePlayerList)
             {
@@ -116,7 +120,7 @@ namespace Oxide.Plugins
             return null;
         }
 
-        void OnLootEntityEnd(BasePlayer player, BaseCombatEntity entity)
+        private void OnLootEntityEnd(BasePlayer player, BaseCombatEntity entity)
         {
             if(!player.IPlayer.HasPermission(permTCGuiUse)) return;
             if(!cuploot.ContainsKey(entity.net.ID)) return;
@@ -134,9 +138,9 @@ namespace Oxide.Plugins
 
         #region Main
         [Command("tc")]
-        void CmdTCGUI(IPlayer iplayer, string command, string[] args)
+        private void CmdTCGUI(IPlayer iplayer, string command, string[] args)
         {
-            if(!iplayer.HasPermission(permTCGuiUse)) return;
+            if (!iplayer.HasPermission(permTCGuiUse)) { Message(iplayer, "notauthorized"); return; }
 #if DEBUG
             string debug = string.Join(",", args); Puts($"{debug}");
 #endif
@@ -150,7 +154,7 @@ namespace Oxide.Plugins
             }
 
             List<BuildingPrivlidge> cupboards = new List<BuildingPrivlidge>();
-            Vis.Entities<BuildingPrivlidge>(player.transform.position, configData.Settings.cupboardRange, cupboards);
+            Vis.Entities(player.transform.position, configData.Settings.cupboardRange, cupboards);
             foreach(var ent in cupboards)
             {
                 if(ent.IsAuthed(player))
@@ -268,6 +272,7 @@ namespace Oxide.Plugins
                         foreach(var auth in ent.authorizedPlayers.Select(x => x.userid).ToArray())
                         {
                             var theplayer = BasePlayer.Find(auth.ToString());
+                            if (theplayer == null) continue;
                             Message(iplayer, theplayer.displayName);
                         }
                     }
@@ -276,10 +281,10 @@ namespace Oxide.Plugins
             }
         }
 
-        List<AutoTurret> GetTurrets(Vector3 location, float range = 30f)
+        private List<AutoTurret> GetTurrets(Vector3 location, float range = 30f)
         {
             List<AutoTurret> turrets = new List<AutoTurret>();
-            Vis.Entities<AutoTurret>(location, range, turrets);
+            Vis.Entities(location, range, turrets);
             return turrets;
         }
 
@@ -316,7 +321,7 @@ namespace Oxide.Plugins
             return players;
         }
 
-        void TcGUI(BasePlayer player, BuildingPrivlidge privs)
+        private void TcGUI(BasePlayer player, BuildingPrivlidge privs)
         {
             if (player == null) return;
             if (privs == null) return;
@@ -362,7 +367,6 @@ namespace Oxide.Plugins
 #if DEBUG
                 Puts($"Found authorized player ({theplayer.userID}/{theplayer.displayName})");
 #endif
-
                 if(theplayer.userID == player.userID) continue;
                 nc++;
 
@@ -399,7 +403,8 @@ namespace Oxide.Plugins
                 foreach(var auth in turret.authorizedPlayers.Select(x => x.userid).ToArray())
                 {
                     var findme = BasePlayer.Find(auth.ToString());
-                    if(findme.userID == player.userID) authed = true;
+                    if (findme == null) continue;
+                    if (findme.userID == player.userID) authed = true;
                 }
 
                 if(authed)
@@ -414,6 +419,7 @@ namespace Oxide.Plugins
                 foreach(var auth in turret.authorizedPlayers.Select(x => x.userid).ToArray())
                 {
                     BasePlayer theplayer = FindPlayers(auth.ToString()).FirstOrDefault();
+                    if (theplayer == null) continue;
                     if(theplayer.userID == player.userID) continue;
                     nc++;
 
@@ -430,7 +436,7 @@ namespace Oxide.Plugins
             CuiHelper.AddUi(player, container);
         }
 
-        void PlayerSelectGUI(BasePlayer player, string mode = "cupboard", uint turretid=0)
+        private void PlayerSelectGUI(BasePlayer player, string mode = "cupboard", uint turretid=0)
         {
             CuiHelper.DestroyUi(player, TCGUP);
 
@@ -515,7 +521,7 @@ namespace Oxide.Plugins
             CuiHelper.AddUi(player, container);
         }
 
-        void TcButtonGUI(BasePlayer player, BaseEntity entity)
+        private void TcButtonGUI(BasePlayer player, BaseEntity entity)
         {
             CuiHelper.DestroyUi(player, TCGUB);
 
@@ -666,7 +672,7 @@ namespace Oxide.Plugins
 
         protected override void LoadDefaultConfig() => Puts("New configuration file created.");
 
-        void LoadConfigValues()
+        private void LoadConfigValues()
         {
             configData = Config.ReadObject<ConfigData>();
             configData.Version = Version;
