@@ -33,7 +33,7 @@ using System.Linq;
 
 namespace Oxide.Plugins
 {
-    [Info("Tool Cupboard GUI", "RFC1920", "1.0.10")]
+    [Info("Tool Cupboard GUI", "RFC1920", "1.0.11")]
     [Description("Manage TC and Turret auth")]
     class TCGui : RustPlugin
     {
