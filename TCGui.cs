@@ -173,8 +173,27 @@ namespace Oxide.Plugins
                         {
                             if(args.Length > 2)
                             {
-                                // tc guisel turret turretid
-                                PlayerSelectGUI(player, "turret", uint.Parse(args[2]));
+                                //      0     1      2      3    4
+                                // tc guisel MODE TURRETID page NUM
+                                // tc guisel cupboard 0    page 1
+                                if (args.Length > 3)
+                                {
+                                    if (args[3] == "page" && args.Length > 4)
+                                    {
+#if DEBUG
+                                        Puts($"Mode: {args[1]}, turretid = {args[2]}, page = {args[4]}");
+#endif
+                                        PlayerSelectGUI(player, args[1], uint.Parse(args[2]), uint.Parse(args[4]));
+                                    }
+                                }
+                                else
+                                {
+                                    // tc guisel turret turretid
+#if DEBUG
+                                    Puts($"Mode: turret, turretid = {args[2].ToString()}");
+#endif
+                                    PlayerSelectGUI(player, "turret", uint.Parse(args[2]));
+                                }
                             }
                             else
                             {
@@ -436,10 +455,14 @@ namespace Oxide.Plugins
             CuiHelper.AddUi(player, container);
         }
 
-        private void PlayerSelectGUI(BasePlayer player, string mode = "cupboard", uint turretid=0)
+        private void PlayerSelectGUI(BasePlayer player, string mode = "cupboard", uint turretid=0, uint page=0)
         {
             CuiHelper.DestroyUi(player, TCGUP);
 
+            int total = BasePlayer.activePlayerList.Count + BasePlayer.sleepingPlayerList.Count;
+#if DEBUG
+            total += 300;
+#endif
             string description = Lang("tcguisel") + ": " + Lang(mode);
             if(mode == "turret") description += $" {turretid.ToString()}";
             CuiElementContainer container = UI.Container(TCGUP, UI.Color("242424", 1f), "0.1 0.1", "0.9 0.9", true, "Overlay");
@@ -447,42 +470,94 @@ namespace Oxide.Plugins
             UI.Label(ref container, TCGUP, UI.Color("#d85540", 1f), Lang("online"), 12, "0.72 0.92", "0.77 1");
             UI.Label(ref container, TCGUP, UI.Color("#555500", 1f), Lang("offline"), 12, "0.79 0.92", "0.86 1");
             UI.Button(ref container, TCGUP, UI.Color("#d85540", 1f), Lang("close"), 12, "0.92 0.93", "0.985 0.98", $"tc guiselclose");
+            // Pagination
+            if(page > 0)
+            {
+                UI.Button(ref container, TCGUP, UI.Color("#d85540", 1f), "<<", 12, "0.01 0.001", "0.04 0.03", $"tc guisel {mode} {turretid} page {page-1}");
+            }
+            if (total > 98 && (page+1) * 98 < total)
+            {
+                UI.Button(ref container, TCGUP, UI.Color("#d85540", 1f), ">>", 12, "0.96 0.001", "0.99 0.03", $"tc guisel {mode} {turretid} page {page + 1}");
+            }
             int col = 0;
             int row = 0;
             bool found = false;
 
+            int iter = 0;
 #if DEBUG
-            List<ulong> npcs = (List<ulong>)HumanNPC?.Call("HumanNPCs");
-            foreach(ulong npc in npcs)
+            // Show fake players
+            for(int f=1; f < 301; f++)
             {
+                iter++;
                 found = true;
+                // Pagination
+                if (page > 0)
+                {
+                    if (iter <= page * 98) continue; 
+                    if (iter > (page+1) * 98) continue;
+                }
+                else
+                {
+                    if (iter > 98)
+                    {
+                        continue;
+                    }
+                }
                 if(row > 13)
                 {
                     row = 0;
                     col++;
                 }
+                if(col > 7)
+                {
+                    col = 0; row = 0;
+                    continue;
+                }
+                //Puts($"ITER: iter={iter.ToString()}, row={row.ToString()}, col={col.ToString()}, page={page}");
+
                 float[] posb = GetButtonPositionP(row, col);
-                var hName = (string)HumanNPC?.Call("HumanNPCname", npc);
+                var hName = "FAKE" + f.ToString();
                 if(mode == "turret" && turretid > 0)
                 {
-                    UI.Button(ref container, TCGUP, UI.Color("#d85540", 1f), hName, 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"tc tadd {npc.ToString()} {turretid.ToString()}");
+                    UI.Button(ref container, TCGUP, UI.Color("#d85540", 1f), hName, 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"tc tadd {f.ToString()} {turretid.ToString()}");
                 }
                 else
                 {
-                    UI.Button(ref container, TCGUP, UI.Color("#d85540", 1f), hName, 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"tc add {npc.ToString()} {hName}");
+                    UI.Button(ref container, TCGUP, UI.Color("#d85540", 1f), hName, 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"tc add {f.ToString()} {hName}");
                 }
                 row++;
             }
 #endif
-            foreach(BasePlayer user in BasePlayer.activePlayerList)
+            foreach(BasePlayer user in BasePlayer.activePlayerList.OrderBy(o => o.displayName).ToList())
             {
-                if(user.userID == player.userID) continue;
+                iter++;
                 found = true;
+                if(user.userID == player.userID) continue;
+
+                // Pagination
+                if (page > 0)
+                {
+                    if (iter <= page * 98) continue; 
+                    if (iter > (page+1) * 98) continue;
+                }
+                else
+                {
+                    if (iter > 98)
+                    {
+                        continue;
+                    }
+                }
                 if(row > 13)
                 {
                     row = 0;
                     col++;
                 }
+                if(col > 7)
+                {
+                    col = 0; row = 0;
+                    continue;
+                }
+
                 float[] posb = GetButtonPositionP(row, col);
                 if(mode == "turret" && turretid > 0)
                 {
@@ -494,14 +569,36 @@ namespace Oxide.Plugins
                 }
                 row++;
             }
-            foreach(BasePlayer user in BasePlayer.sleepingPlayerList)
+
+            foreach(BasePlayer user in BasePlayer.sleepingPlayerList.OrderBy(o => o.displayName).ToList())
             {
+                iter++;
                 found = true;
+                // Pagination
+                if (page > 0)
+                {
+                    if (iter <= page * 98) continue; 
+                    if (iter > (page+1) * 98) continue;
+                }
+                else
+                {
+                    if (iter > 98)
+                    {
+                        continue;
+                    }
+                }
                 if(row > 13)
                 {
                     row = 0;
                     col++;
                 }
+                if(col > 7)
+                {
+                    col = 0; row = 0;
+                    continue;
+                }
+
+
                 float[] posb = GetButtonPositionP(row, col);
                 if(mode == "turret" && turretid > 0)
                 {
@@ -546,9 +643,9 @@ namespace Oxide.Plugins
 
             return new float[] { offsetX, offsetY, offsetX + 0.226f, offsetY + 0.03f };
         }
-        #endregion
+#endregion
 
-        #region Classes
+#region Classes
         public static class UI
         {
             public static CuiElementContainer Container(string panel, string color, string min, string max, bool useCursor = false, string parent = "Overlay")
@@ -655,9 +752,9 @@ namespace Oxide.Plugins
                 return $"{(double)red / 255} {(double)green / 255} {(double)blue / 255} {alpha}";
             }
         }
-        #endregion
+#endregion
 
-        #region config
+#region config
         private class ConfigData
         {
             public Settings Settings = new Settings();
@@ -684,6 +781,6 @@ namespace Oxide.Plugins
         {
             Config.WriteObject(config, true);
         }
-        #endregion
+#endregion
     }
 }
