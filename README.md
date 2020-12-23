@@ -21,17 +21,22 @@ The user must be within range of the cupboard to access the GUI.  They must also
   "Settings": {
     "cupboardRange": 3.0,
     "turretRange": 30.0
+    "limitToFriends": false,
+    "useFriends": false,
+    "useClans": false,
+    "useTeams": false
   },
   "Version": {
     "Major": 1,
     "Minor": 0,
-    "Patch": 7
+    "Patch": 12
   }
 }
 ```
 
 - `cupboardRange` -- Sets the minimum distance for interacting with a cupboard.  3f was the original default.  5f might work better for you.  Don't set it too high or you may see overlap and odd behavior.
 - `turretRange` -- Sets the maximum distance from a cupboard to locate turrets.  30f is the default, which should be close to actual cupboard protection range.  You can adjust higher as needed if the plugin fails to find your local turrets.
+- `limitToFriends` -- If true, the list of available players to select will be limited depending on the value of useFriends, useClans, and useTeams.
 
 ### Permissions
 

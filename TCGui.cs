@@ -33,13 +33,13 @@ using System.Linq;
 
 namespace Oxide.Plugins
 {
-    [Info("Tool Cupboard GUI", "RFC1920", "1.0.11")]
+    [Info("Tool Cupboard GUI", "RFC1920", "1.0.12")]
     [Description("Manage TC and Turret auth")]
     class TCGui : RustPlugin
     {
         #region vars
         [PluginReference]
-        readonly Plugin HumanNPC;
+        readonly Plugin HumanNPC, Friends, Clans;
 
         private ConfigData configData;
         private const string permTCGuiUse = "tcgui.use";
@@ -307,37 +307,47 @@ namespace Oxide.Plugins
             return turrets;
         }
 
-        private static HashSet<BasePlayer> FindPlayers(string nameOrIdOrIp)
+        private bool IsFriend(ulong playerid, ulong ownerid)
         {
-            var players = new HashSet<BasePlayer>();
-            if (string.IsNullOrEmpty(nameOrIdOrIp)) return players;
-            foreach(var activePlayer in BasePlayer.activePlayerList)
+            if (configData.Settings.useFriends && Friends != null)
             {
-                if(activePlayer.UserIDString.Equals(nameOrIdOrIp))
+                var fr = Friends?.CallHook("AreFriends", playerid, ownerid);
+                if (fr != null && (bool)fr)
                 {
-                    players.Add(activePlayer);
-                }
-                else if(!string.IsNullOrEmpty(activePlayer.displayName) && activePlayer.displayName.Contains(nameOrIdOrIp, CompareOptions.IgnoreCase))
-                {
-                    players.Add(activePlayer);
-                }
-                else if(activePlayer.net?.connection != null && activePlayer.net.connection.ipaddress.Equals(nameOrIdOrIp))
-                {
-                    players.Add(activePlayer);
+                    return true;
                 }
             }
-            foreach(var sleepingPlayer in BasePlayer.sleepingPlayerList)
+            if (configData.Settings.useClans && Clans != null)
             {
-                if(sleepingPlayer.UserIDString.Equals(nameOrIdOrIp))
+                string playerclan = (string)Clans?.CallHook("GetClanOf", playerid);
+                string ownerclan = (string)Clans?.CallHook("GetClanOf", ownerid);
+                if (playerclan != null && ownerclan != null)
                 {
-                    players.Add(sleepingPlayer);
-                }
-                else if(!string.IsNullOrEmpty(sleepingPlayer.displayName) && sleepingPlayer.displayName.Contains(nameOrIdOrIp, CompareOptions.IgnoreCase))
-                {
-                    players.Add(sleepingPlayer);
+                    if (playerclan == ownerclan)
+                    {
+                        return true;
+                    }
                 }
             }
-            return players;
+            if (configData.Settings.useTeams)
+            {
+                BasePlayer player = BasePlayer.FindByID(playerid);
+                if (player != null)
+                {
+                    if (player.currentTeam != 0)
+                    {
+                        RelationshipManager.PlayerTeam playerTeam = RelationshipManager.Instance.FindTeam(player.currentTeam);
+                        if (playerTeam != null)
+                        {
+                            if (playerTeam.members.Contains(ownerid))
+                            {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+            return false;
         }
 
         private void TcGUI(BasePlayer player, BuildingPrivlidge privs)
@@ -381,7 +391,7 @@ namespace Oxide.Plugins
 
             foreach(var auth in privs.authorizedPlayers.Select(x => x.userid).ToArray())
             {
-                BasePlayer theplayer = FindPlayers(auth.ToString()).FirstOrDefault();
+                BasePlayer theplayer = BasePlayer.FindByID(auth);
                 if(theplayer == null) continue;
 #if DEBUG
                 Puts($"Found authorized player ({theplayer.userID}/{theplayer.displayName})");
@@ -437,9 +447,13 @@ namespace Oxide.Plugins
 
                 foreach(var auth in turret.authorizedPlayers.Select(x => x.userid).ToArray())
                 {
-                    BasePlayer theplayer = FindPlayers(auth.ToString()).FirstOrDefault();
+                    BasePlayer theplayer = BasePlayer.FindByID(auth);
                     if (theplayer == null) continue;
-                    if(theplayer.userID == player.userID) continue;
+                    if (theplayer.userID == player.userID) continue;
+                    if (configData.Settings.limitToFriends)
+                    {
+                        if (!IsFriend(theplayer.userID, privs.OwnerID)) continue;
+                    }
                     nc++;
 
                     posn = GetButtonPosition(nc, 5);
@@ -533,6 +547,10 @@ namespace Oxide.Plugins
                 iter++;
                 found = true;
                 if(user.userID == player.userID) continue;
+                if (configData.Settings.limitToFriends)
+                {
+                    if (!IsFriend(user.userID, player.OwnerID)) continue;
+                }
 
                 // Pagination
                 if (page > 0)
@@ -574,6 +592,11 @@ namespace Oxide.Plugins
             {
                 iter++;
                 found = true;
+                if (configData.Settings.limitToFriends)
+                {
+                    if (!IsFriend(user.userID, player.OwnerID)) continue;
+                }
+
                 // Pagination
                 if (page > 0)
                 {
@@ -622,8 +645,8 @@ namespace Oxide.Plugins
         {
             CuiHelper.DestroyUi(player, TCGUB);
 
-            CuiElementContainer container = UI.Container(TCGUB, UI.Color("cccccc", 1f), "0.9 0.812", "0.946 0.835", true, "Overlay");
-            UI.Button(ref container, TCGUB, UI.Color("#424242", 1f), Lang("manage"), 12, "0 0", "1 1", $"tc guibtn");
+            CuiElementContainer container = UI.Container(TCGUB, UI.Color("FFF5E0", 0.16f), "0.9 0.812", "0.946 0.835", true, "Overlay");
+            UI.Button(ref container, TCGUB, UI.Color("#424242", 1f), Lang("manage"), 12, "0 0", "1 1", $"tc guibtn", TextAnchor.MiddleCenter, "CCCCCC");
 
             CuiHelper.AddUi(player, container);
         }
@@ -685,13 +708,13 @@ namespace Oxide.Plugins
                 panel);
 
             }
-            public static void Button(ref CuiElementContainer container, string panel, string color, string text, int size, string min, string max, string command, TextAnchor align = TextAnchor.MiddleCenter)
+            public static void Button(ref CuiElementContainer container, string panel, string color, string text, int size, string min, string max, string command, TextAnchor align = TextAnchor.MiddleCenter, string tcolor="FFFFFF")
             {
                 container.Add(new CuiButton
                 {
                     Button = { Color = color, Command = command, FadeIn = 0f },
                     RectTransform = { AnchorMin = min, AnchorMax = max },
-                    Text = { Text = text, FontSize = size, Align = align }
+                    Text = { Text = text, FontSize = size, Align = align, Color = Color(tcolor, 1f) }
                 },
                 panel);
             }
@@ -765,6 +788,10 @@ namespace Oxide.Plugins
         {
             public float cupboardRange = 3f;
             public float turretRange = 30f;
+            public bool limitToFriends = false;
+            public bool useFriends = false;
+            public bool useClans = false;
+            public bool useTeams = false;
         }
 
         protected override void LoadDefaultConfig() => Puts("New configuration file created.");
