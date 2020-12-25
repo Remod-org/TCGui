@@ -21,7 +21,6 @@
 */
 #endregion License Information (GPL v3)
 //#define DEBUG
-using System;
 using System.Collections.Generic;
 using System.Globalization;
 using Oxide.Core;
@@ -450,10 +449,6 @@ namespace Oxide.Plugins
                     BasePlayer theplayer = BasePlayer.FindByID(auth);
                     if (theplayer == null) continue;
                     if (theplayer.userID == player.userID) continue;
-                    if (configData.Settings.limitToFriends)
-                    {
-                        if (!IsFriend(theplayer.userID, privs.OwnerID)) continue;
-                    }
                     nc++;
 
                     posn = GetButtonPosition(nc, 5);
@@ -549,7 +544,7 @@ namespace Oxide.Plugins
                 if(user.userID == player.userID) continue;
                 if (configData.Settings.limitToFriends)
                 {
-                    if (!IsFriend(user.userID, player.OwnerID)) continue;
+                    if (!IsFriend(user.userID, player.userID)) continue;
                 }
 
                 // Pagination
@@ -594,7 +589,7 @@ namespace Oxide.Plugins
                 found = true;
                 if (configData.Settings.limitToFriends)
                 {
-                    if (!IsFriend(user.userID, player.OwnerID)) continue;
+                    if (!IsFriend(user.userID, player.userID)) continue;
                 }
 
                 // Pagination
