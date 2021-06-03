@@ -32,7 +32,7 @@ using System.Linq;
 
 namespace Oxide.Plugins
 {
-    [Info("Tool Cupboard GUI", "RFC1920", "1.0.13")]
+    [Info("Tool Cupboard GUI", "RFC1920", "1.0.14")]
     [Description("Manage TC and Turret auth")]
     class TCGui : RustPlugin
     {
@@ -103,6 +103,14 @@ namespace Oxide.Plugins
                 CuiHelper.DestroyUi(player, TCGUP);
                 CuiHelper.DestroyUi(player, TCGUB);
             }
+        }
+
+        void OnUserConnected(IPlayer iplayer) => OnUserDisconnected(iplayer);
+        void OnUserDisconnected(IPlayer iplayer)
+        {
+            CuiHelper.DestroyUi(iplayer.Object as BasePlayer, TCGUI);
+            CuiHelper.DestroyUi(iplayer.Object as BasePlayer, TCGUP);
+            CuiHelper.DestroyUi(iplayer.Object as BasePlayer, TCGUB);
         }
 
         private object CanLootEntity(BasePlayer player, StorageContainer container)
@@ -338,7 +346,7 @@ namespace Oxide.Plugins
                 {
                     if (player.currentTeam != 0)
                     {
-                        RelationshipManager.PlayerTeam playerTeam = RelationshipManager.Instance.FindTeam(player.currentTeam);
+                        RelationshipManager.PlayerTeam playerTeam = RelationshipManager.ServerInstance.FindTeam(player.currentTeam);
                         if (playerTeam != null)
                         {
                             if (playerTeam.members.Contains(ownerid))
