@@ -32,8 +32,8 @@ using System.Linq;
 
 namespace Oxide.Plugins
 {
-    [Info("Tool Cupboard GUI", "RFC1920", "1.0.14")]
-    [Description("Manage TC and Turret auth")]
+    [Info("Tool Cupboard GUI", "RFC1920", "1.0.15")]
+    [Description("Manage TC and Turret Auth")]
     class TCGui : RustPlugin
     {
         #region vars
@@ -138,11 +138,11 @@ namespace Oxide.Plugins
 
             if (cuploot[entity.net.ID] == player.userID)
             {
-                CuiHelper.DestroyUi(player, TCGUI);
-                CuiHelper.DestroyUi(player, TCGUB);
-                CuiHelper.DestroyUi(player, TCGUP);
                 cuploot.Remove(entity.net.ID);
             }
+            CuiHelper.DestroyUi(player, TCGUI);
+            CuiHelper.DestroyUi(player, TCGUB);
+            CuiHelper.DestroyUi(player, TCGUP);
         }
         #endregion
 
