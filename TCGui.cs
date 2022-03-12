@@ -20,7 +20,6 @@
     Optionally you can also view the license at <http://www.gnu.org/licenses/>.
 */
 #endregion License Information (GPL v3)
-//#define DEBUG
 using System.Collections.Generic;
 using System.Globalization;
 using Oxide.Core;
@@ -32,19 +31,19 @@ using System.Linq;
 
 namespace Oxide.Plugins
 {
-    [Info("Tool Cupboard GUI", "RFC1920", "1.0.15")]
+    [Info("Tool Cupboard GUI", "RFC1920", "1.0.16")]
     [Description("Manage TC and Turret Auth")]
-    class TCGui : RustPlugin
+    internal class TCGui : RustPlugin
     {
         #region vars
         [PluginReference]
-        readonly Plugin HumanNPC, Friends, Clans;
+        private readonly Plugin HumanNPC, Friends, Clans;
 
         private ConfigData configData;
         private const string permTCGuiUse = "tcgui.use";
-        const string TCGUI = "tcgui.editor";
-        const string TCGUP = "tcgui.players";
-        const string TCGUB = "tcgui.button";
+        private const string TCGUI = "tcgui.editor";
+        private const string TCGUP = "tcgui.players";
+        private const string TCGUB = "tcgui.button";
 
         private readonly Dictionary<string, string> onlinePlayers = new Dictionary<string, string>();
         private readonly Dictionary<string, string> offlinePlayers = new Dictionary<string, string>();
@@ -105,8 +104,9 @@ namespace Oxide.Plugins
             }
         }
 
-        void OnUserConnected(IPlayer iplayer) => OnUserDisconnected(iplayer);
-        void OnUserDisconnected(IPlayer iplayer)
+        private void OnUserConnected(IPlayer iplayer) => OnUserDisconnected(iplayer);
+
+        private void OnUserDisconnected(IPlayer iplayer)
         {
             CuiHelper.DestroyUi(iplayer.Object as BasePlayer, TCGUI);
             CuiHelper.DestroyUi(iplayer.Object as BasePlayer, TCGUP);
@@ -115,8 +115,8 @@ namespace Oxide.Plugins
 
         private object CanLootEntity(BasePlayer player, StorageContainer container)
         {
-            if (!player.IPlayer.HasPermission(permTCGuiUse)) return null;
-            var privs = container.GetComponentInParent<BuildingPrivlidge>() ?? null;
+            if (!permission.UserHasPermission(player.UserIDString, permTCGuiUse)) return null;
+            BuildingPrivlidge privs = container.GetComponentInParent<BuildingPrivlidge>();
             if (privs == null) return null;
 
             if (cuploot.ContainsKey(privs.net.ID)) return null;
@@ -132,7 +132,9 @@ namespace Oxide.Plugins
 
         private void OnLootEntityEnd(BasePlayer player, BaseCombatEntity entity)
         {
-            if (!player.IPlayer.HasPermission(permTCGuiUse)) return;
+            if (player == null) return;
+            if (!(entity is BuildingPrivlidge)) return;
+            if (!permission.UserHasPermission(player.UserIDString, permTCGuiUse)) return;
             if (!cuploot.ContainsKey(entity.net.ID)) return;
             if (entity == null) return;
 
@@ -150,22 +152,20 @@ namespace Oxide.Plugins
         [Command("tc")]
         private void CmdTCGUI(IPlayer iplayer, string command, string[] args)
         {
+			if (iplayer.Id == "server_console") return;
             if (!iplayer.HasPermission(permTCGuiUse)) { Message(iplayer, "notauthorized"); return; }
-#if DEBUG
-            string debug = string.Join(",", args); Puts($"{debug}");
-#endif
-            var player = iplayer.Object as BasePlayer;
-            if (args.Length > 0)
+
+            if (configData.Settings.debug) Puts(string.Join(",", args));
+
+            BasePlayer player = iplayer.Object as BasePlayer;
+            if (args.Length > 0 && args[0] == "guiclose")
             {
-                if (args[0] == "guiclose")
-                {
-                    CuiHelper.DestroyUi(player, TCGUI);
-                }
+                CuiHelper.DestroyUi(player, TCGUI);
             }
 
             List<BuildingPrivlidge> cupboards = new List<BuildingPrivlidge>();
             Vis.Entities(player.transform.position, configData.Settings.cupboardRange, cupboards);
-            foreach (var ent in cupboards)
+            foreach (BuildingPrivlidge ent in cupboards)
             {
                 if (ent.IsAuthed(player))
                 {
@@ -190,18 +190,14 @@ namespace Oxide.Plugins
                                 {
                                     if (args[3] == "page" && args.Length > 4)
                                     {
-#if DEBUG
-                                        Puts($"Mode: {args[1]}, turretid = {args[2]}, page = {args[4]}");
-#endif
+                                        if (configData.Settings.debug) Puts($"Mode: {args[1]}, turretid = {args[2]}, page = {args[4]}");
                                         PlayerSelectGUI(player, args[1], uint.Parse(args[2]), uint.Parse(args[4]));
                                     }
                                 }
                                 else
                                 {
                                     // tc guisel turret turretid
-#if DEBUG
-                                    Puts($"Mode: turret, turretid = {args[2].ToString()}");
-#endif
+                                    if (configData.Settings.debug) Puts($"Mode: turret, turretid = {args[2]}");
                                     PlayerSelectGUI(player, "turret", uint.Parse(args[2]));
                                 }
                             }
@@ -216,13 +212,11 @@ namespace Oxide.Plugins
                         }
                         else if (args[0] == "remove" && args.Length > 1)
                         {
-#if DEBUG
-                            Puts($"Removing player ({args[1]}) from TC");
-#endif
+                            if (configData.Settings.debug) Puts($"Removing player ({args[1]}) from TC");
                             CuiHelper.DestroyUi(player, TCGUP);
                             // tc remove 7656XXXXXXXXXXXX
 
-                            foreach (var p in ent.authorizedPlayers.ToArray())
+                            foreach (ProtoBuf.PlayerNameID p in ent.authorizedPlayers.ToArray())
                             {
                                 if (p.userid == ulong.Parse(args[1]))
                                 {
@@ -234,13 +228,11 @@ namespace Oxide.Plugins
                         }
                         else if (args[0] == "add" && args.Length > 2)
                         {
-#if DEBUG
-                            Puts($"Adding player ({args[1]}/{args[2]}) to TC");
-#endif
+                            if (configData.Settings.debug) Puts($"Adding player ({args[1]}/{args[2]}) to TC");
                             CuiHelper.DestroyUi(player, TCGUP);
                             // tc add 7656XXXXXXXXXXXX RFC1920
                             bool exists = false;
-                            foreach (var p in ent.authorizedPlayers.ToArray())
+                            foreach (ProtoBuf.PlayerNameID p in ent.authorizedPlayers.ToArray())
                             {
                                 if (p.userid == ulong.Parse(args[1]))
                                 {
@@ -262,11 +254,11 @@ namespace Oxide.Plugins
                         {
                             CuiHelper.DestroyUi(player, TCGUP);
                             // tc tremove 7656XXXXXXXXXXXX TURRETID
-                            var turret = BaseNetworkable.serverEntities.Find(uint.Parse(args[2])) as AutoTurret;
+                            AutoTurret turret = BaseNetworkable.serverEntities.Find(uint.Parse(args[2])) as AutoTurret;
 
                             if (turret != null)
                             {
-                                foreach (var p in turret.authorizedPlayers.ToArray())
+                                foreach (ProtoBuf.PlayerNameID p in turret.authorizedPlayers.ToArray())
                                 {
                                     if (p.userid == ulong.Parse(args[1]))
                                     {
@@ -281,7 +273,7 @@ namespace Oxide.Plugins
                         {
                             CuiHelper.DestroyUi(player, TCGUP);
                             // tc tadd 7656XXXXXXXXXXXX NAME TURRETID
-                            var turret = BaseNetworkable.serverEntities.Find(uint.Parse(args[3])) as AutoTurret;
+                            AutoTurret turret = BaseNetworkable.serverEntities.Find(uint.Parse(args[3])) as AutoTurret;
 
                             if (turret != null)
                             {
@@ -298,9 +290,9 @@ namespace Oxide.Plugins
                     else
                     {
                         Message(iplayer, "foundtc");
-                        foreach (var auth in ent.authorizedPlayers.Select(x => x.userid).ToArray())
+                        foreach (ulong auth in ent.authorizedPlayers.Select(x => x.userid).ToArray())
                         {
-                            var theplayer = BasePlayer.Find(auth.ToString());
+                            BasePlayer theplayer = BasePlayer.Find(auth.ToString());
                             if (theplayer == null) continue;
                             Message(iplayer, theplayer.displayName);
                         }
@@ -321,7 +313,7 @@ namespace Oxide.Plugins
         {
             if (configData.Settings.useFriends && Friends != null)
             {
-                var fr = Friends?.CallHook("AreFriends", playerid, ownerid);
+                object fr = Friends?.CallHook("AreFriends", playerid, ownerid);
                 if (fr != null && (bool)fr)
                 {
                     return true;
@@ -331,29 +323,20 @@ namespace Oxide.Plugins
             {
                 string playerclan = (string)Clans?.CallHook("GetClanOf", playerid);
                 string ownerclan = (string)Clans?.CallHook("GetClanOf", ownerid);
-                if (playerclan != null && ownerclan != null)
+                if (playerclan != null && ownerclan != null && playerclan == ownerclan)
                 {
-                    if (playerclan == ownerclan)
-                    {
-                        return true;
-                    }
+                    return true;
                 }
             }
             if (configData.Settings.useTeams)
             {
                 BasePlayer player = BasePlayer.FindByID(playerid);
-                if (player != null)
+                if (player != null && player.currentTeam != 0)
                 {
-                    if (player.currentTeam != 0)
+                    RelationshipManager.PlayerTeam playerTeam = RelationshipManager.ServerInstance.FindTeam(player.currentTeam);
+                    if (playerTeam?.members.Contains(ownerid) == true)
                     {
-                        RelationshipManager.PlayerTeam playerTeam = RelationshipManager.ServerInstance.FindTeam(player.currentTeam);
-                        if (playerTeam != null)
-                        {
-                            if (playerTeam.members.Contains(ownerid))
-                            {
-                                return true;
-                            }
-                        }
+                        return true;
                     }
                 }
             }
@@ -376,15 +359,15 @@ namespace Oxide.Plugins
             UI.Icon(ref container, TCGUI, UI.Color("#ffffff", 1f), string.Format(trurl, 140), "0.49 0.83", "0.54 0.9");
             UI.Label(ref container, TCGUI, UI.Color("#ffffff", 1f), Lang("turrets"), 14, "0.5 0.83", "0.7 0.9");
 
-            int nc = 0;
-            float[] n = GetButtonPosition(nc, 1);
-            float[] b = GetButtonPosition(nc, 2);
+            int row = 0;
+            float[] n = GetButtonPosition(row, 0);
+            float[] b = GetButtonPosition(row, 1);
             UI.Label(ref container, TCGUI, UI.Color("#ffffff", 1f), Lang("me"), 12, $"{n[0]} {n[1]}", $"{n[0] + ((n[2] - n[0]) / 2)} {n[3]}", TextAnchor.MiddleLeft);
             bool authed = false;
 
-            foreach (var auth in privs.authorizedPlayers.Select(x => x.userid).ToArray())
+            foreach (ulong auth in privs.authorizedPlayers.Select(x => x.userid).ToArray())
             {
-                var findme = BasePlayer.Find(auth.ToString());
+                BasePlayer findme = BasePlayer.Find(auth.ToString());
                 if (findme == null) continue;
                 if (findme.userID == player.userID) authed = true;
                 break;
@@ -399,49 +382,45 @@ namespace Oxide.Plugins
                 UI.Button(ref container, TCGUI, UI.Color("#cccccc", 1f), Lang("add"), 12, $"{b[0]} {b[1]}", $"{b[0] + ((b[2] - b[0]) / 2)} {b[3]}", $"tc add {player.userID} {player.displayName}");
             }
 
-            foreach (var auth in privs.authorizedPlayers.Select(x => x.userid).ToArray())
+            foreach (ulong auth in privs.authorizedPlayers.Select(x => x.userid).ToArray())
             {
                 BasePlayer theplayer = BasePlayer.FindByID(auth);
                 if (theplayer == null) continue;
-#if DEBUG
-                Puts($"Found authorized player ({theplayer.userID}/{theplayer.displayName})");
-#endif
+                if (configData.Settings.debug) Puts($"Found authorized player ({theplayer.userID}/{theplayer.displayName})");
                 if (theplayer.userID == player.userID) continue;
-                nc++;
+                row++;
 
-                float[] posn = GetButtonPosition(nc, 1);
-                float[] posb = GetButtonPosition(nc, 2);
+                float[] posn = GetButtonPosition(row, 0);
+                float[] posb = GetButtonPosition(row, 1);
 
                 UI.Label(ref container, TCGUI, UI.Color("#ffffff", 1f), theplayer.displayName, 12, $"{posn[0]} {posn[1]}", $"{posn[0] + ((posn[2] - posn[0]) / 2)} {posn[3]}", TextAnchor.MiddleLeft);
                 UI.Button(ref container, TCGUI, UI.Color("#d85540", 1f), Lang("remove"), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"tc remove {theplayer.userID}");
-
             }
-            nc++;
+            row++;
 
-            float[] poss = GetButtonPosition(nc, 2);
+            float[] poss = GetButtonPosition(row -1, 2);
             UI.Button(ref container, TCGUI, UI.Color("115540", 1f), Lang("select"), 12, $"{poss[0]} {poss[1]}", $"{poss[0] + ((poss[2] - poss[0]) / 2)} {poss[3]}", $"tc guisel");
 
             List<AutoTurret> turrets = GetTurrets(player.transform.position, configData.Settings.turretRange);
             List<ulong> foundturrets = new List<ulong>();
 
-            nc = -1;
-            foreach (var turret in turrets)
+            row = 0;
+            foreach (AutoTurret turret in turrets)
             {
                 if (foundturrets.Contains(turret.net.ID)) continue;
                 foundturrets.Add(turret.net.ID);
 
-                nc++;
-                float[] posn = GetButtonPosition(nc, 4);
+                float[] posn = GetButtonPosition(row, 4);
                 UI.Label(ref container, TCGUI, UI.Color("#ffffff", 1f), turret.net.ID.ToString(), 12, $"{posn[0]} {posn[1]}", $"{posn[0] + ((posn[2] - posn[0]) / 2)} {posn[3]}", TextAnchor.MiddleLeft);
 
-                n = GetButtonPosition(nc, 5);
-                b = GetButtonPosition(nc, 6);
+                n = GetButtonPosition(row, 5);
+                b = GetButtonPosition(row, 6);
                 UI.Label(ref container, TCGUI, UI.Color("#ffffff", 1f), Lang("me"), 12, $"{n[0]} {n[1]}", $"{n[0] + ((n[2] - n[0]) / 2)} {n[3]}", TextAnchor.MiddleLeft);
 
                 authed = false;
-                foreach (var auth in turret.authorizedPlayers.Select(x => x.userid).ToArray())
+                foreach (ulong auth in turret.authorizedPlayers.Select(x => x.userid).ToArray())
                 {
-                    var findme = BasePlayer.Find(auth.ToString());
+                    BasePlayer findme = BasePlayer.Find(auth.ToString());
                     if (findme == null) continue;
                     if (findme.userID == player.userID) authed = true;
                 }
@@ -455,21 +434,22 @@ namespace Oxide.Plugins
                     UI.Button(ref container, TCGUI, UI.Color("#cccccc", 1f), Lang("add"), 12, $"{b[0]} {b[1]}", $"{b[0] + ((b[2] - b[0]) / 2)} {b[3]}", $"tc tadd {player.userID} {player.displayName} {turret.net.ID.ToString()}");
                 }
 
-                foreach (var auth in turret.authorizedPlayers.Select(x => x.userid).ToArray())
+                foreach (ulong auth in turret.authorizedPlayers.Select(x => x.userid).ToArray())
                 {
                     BasePlayer theplayer = BasePlayer.FindByID(auth);
                     if (theplayer == null) continue;
                     if (theplayer.userID == player.userID) continue;
-                    nc++;
+                    row++;
 
-                    posn = GetButtonPosition(nc, 5);
-                    float[] posb = GetButtonPosition(nc, 6);
+                    posn = GetButtonPosition(row, 5);
+                    float[] posb = GetButtonPosition(row, 6);
                     UI.Label(ref container, TCGUI, UI.Color("#ffffff", 1f), theplayer.displayName, 12, $"{posn[0]} {posn[1]}", $"{posn[0] + ((posn[2] - posn[0]) / 2)} {posn[3]}", TextAnchor.MiddleLeft);
                     UI.Button(ref container, TCGUI, UI.Color("#d85540", 1f), Lang("remove"), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"tc tremove {theplayer.userID} {turret.net.ID.ToString()}");
                 }
-                nc++;
-                poss = GetButtonPosition(nc, 6);
+
+                poss = GetButtonPosition(row, 7);
                 UI.Button(ref container, TCGUI, UI.Color("#115540", 1f), Lang("select"), 12, $"{poss[0]} {poss[1]}", $"{poss[0] + ((poss[2] - poss[0]) / 2)} {poss[3]}", $"tc guisel turret {turret.net.ID.ToString()}");
+                row++;
             }
 
             CuiHelper.AddUi(player, container);
@@ -480,9 +460,7 @@ namespace Oxide.Plugins
             CuiHelper.DestroyUi(player, TCGUP);
 
             int total = BasePlayer.activePlayerList.Count + BasePlayer.sleepingPlayerList.Count;
-#if DEBUG
-            total += 300;
-#endif
+            if (configData.Settings.debug) total += 300;
             string description = Lang("tcguisel") + ": " + Lang(mode);
             if (mode == "turret") description += $" {turretid.ToString()}";
             CuiElementContainer container = UI.Container(TCGUP, UI.Color("242424", 1f), "0.1 0.1", "0.9 0.9", true, "Overlay");
@@ -504,64 +482,66 @@ namespace Oxide.Plugins
             bool found = false;
 
             int iter = 0;
-#if DEBUG
-            // Show fake players
-            for (int f = 1; f < 301; f++)
+
+            if (configData.Settings.debug)
             {
-                iter++;
-                found = true;
-                // Pagination
-                if (page > 0)
+                // Show fake players
+                for (int f = 1; f < 301; f++)
                 {
-                    if (iter <= page * 98) continue; 
-                    if (iter > (page+1) * 98) continue;
-                }
-                else
-                {
-                    if (iter > 98)
+                    iter++;
+                    found = true;
+                    // Pagination
+                    if (page > 0)
                     {
+                        if (iter <= page * 98) continue;
+                        if (iter > (page + 1) * 98) continue;
+                    }
+                    else
+                    {
+                        if (iter > 98)
+                        {
+                            continue;
+                        }
+                    }
+                    if (row > 13)
+                    {
+                        row = 0;
+                        col++;
+                    }
+                    if (col > 7)
+                    {
+                        col = 0; row = 0;
                         continue;
                     }
-                }
-                if (row > 13)
-                {
-                    row = 0;
-                    col++;
-                }
-                if (col > 7)
-                {
-                    col = 0; row = 0;
-                    continue;
-                }
-                //Puts($"ITER: iter={iter.ToString()}, row={row.ToString()}, col={col.ToString()}, page={page}");
+                    //Puts($"ITER: iter={iter.ToString()}, row={row.ToString()}, col={col.ToString()}, page={page}");
 
-                float[] posb = GetButtonPositionP(row, col);
-                var hName = "FAKE" + f.ToString();
-                if (mode == "turret" && turretid > 0)
-                {
-                    UI.Button(ref container, TCGUP, UI.Color("#d85540", 1f), hName, 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"tc tadd {f.ToString()} {turretid.ToString()}");
+                    float[] posb = GetButtonPositionP(row, col);
+                    string hName = "FAKE" + f.ToString();
+                    if (mode == "turret" && turretid > 0)
+                    {
+                        UI.Button(ref container, TCGUP, UI.Color("#d85540", 1f), hName, 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"tc tadd {f.ToString()} {hName} {turretid.ToString()}");
+                    }
+                    else
+                    {
+                        UI.Button(ref container, TCGUP, UI.Color("#d85540", 1f), hName, 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"tc add {f.ToString()} {hName}");
+                    }
+                    row++;
                 }
-                else
-                {
-                    UI.Button(ref container, TCGUP, UI.Color("#d85540", 1f), hName, 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"tc add {f.ToString()} {hName}");
-                }
-                row++;
             }
-#endif
             foreach (BasePlayer user in BasePlayer.activePlayerList.OrderBy(o => o.displayName).ToList())
             {
                 iter++;
                 found = true;
                 if (user.userID == player.userID) continue;
-                if (configData.Settings.limitToFriends)
+                if (configData.Settings.limitToFriends && !IsFriend(user.userID, player.userID))
                 {
-                    if (!IsFriend(user.userID, player.userID)) continue;
+                    continue;
                 }
 
                 // Pagination
                 if (page > 0)
                 {
-                    if (iter <= page * 98) continue; 
+                    if (iter <= page * 98) continue;
                     if (iter > (page+1) * 98) continue;
                 }
                 else
@@ -598,15 +578,15 @@ namespace Oxide.Plugins
             {
                 iter++;
                 found = true;
-                if (configData.Settings.limitToFriends)
+                if (configData.Settings.limitToFriends && !IsFriend(user.userID, player.userID))
                 {
-                    if (!IsFriend(user.userID, player.userID)) continue;
+                    continue;
                 }
 
                 // Pagination
                 if (page > 0)
                 {
-                    if (iter <= page * 98) continue; 
+                    if (iter <= page * 98) continue;
                     if (iter > (page+1) * 98) continue;
                 }
                 else
@@ -626,7 +606,6 @@ namespace Oxide.Plugins
                     col = 0; row = 0;
                     continue;
                 }
-
 
                 float[] posb = GetButtonPositionP(row, col);
                 if (mode == "turret" && turretid > 0)
@@ -658,6 +637,7 @@ namespace Oxide.Plugins
         }
 
         private int RowNumber(int max, int count) => Mathf.FloorToInt(count / max);
+
         private float[] GetButtonPosition(int rowNumber, int columnNumber)
         {
             float offsetX = 0.05f + (0.096f * columnNumber);
@@ -665,6 +645,7 @@ namespace Oxide.Plugins
 
             return new float[] { offsetX, offsetY, offsetX + 0.196f, offsetY + 0.03f };
         }
+
         private float[] GetButtonPositionP(int rowNumber, int columnNumber)
         {
             float offsetX = 0.05f + (0.126f * columnNumber);
@@ -679,7 +660,7 @@ namespace Oxide.Plugins
         {
             public static CuiElementContainer Container(string panel, string color, string min, string max, bool useCursor = false, string parent = "Overlay")
             {
-                CuiElementContainer container = new CuiElementContainer()
+                return new CuiElementContainer()
                 {
                     {
                         new CuiPanel
@@ -692,8 +673,8 @@ namespace Oxide.Plugins
                         panel
                     }
                 };
-                return container;
             }
+
             public static void Panel(ref CuiElementContainer container, string panel, string color, string min, string max, bool cursor = false)
             {
                 container.Add(new CuiPanel
@@ -704,6 +685,7 @@ namespace Oxide.Plugins
                 },
                 panel);
             }
+
             public static void Label(ref CuiElementContainer container, string panel, string color, string text, int size, string min, string max, TextAnchor align = TextAnchor.MiddleCenter)
             {
                 container.Add(new CuiLabel
@@ -712,8 +694,8 @@ namespace Oxide.Plugins
                     RectTransform = { AnchorMin = min, AnchorMax = max }
                 },
                 panel);
-
             }
+
             public static void Button(ref CuiElementContainer container, string panel, string color, string text, int size, string min, string max, string command, TextAnchor align = TextAnchor.MiddleCenter, string tcolor="FFFFFF")
             {
                 container.Add(new CuiButton
@@ -724,6 +706,7 @@ namespace Oxide.Plugins
                 },
                 panel);
             }
+
             public static void Input(ref CuiElementContainer container, string panel, string color, string text, int size, string command, string min, string max)
             {
                 container.Add(new CuiElement
@@ -747,6 +730,7 @@ namespace Oxide.Plugins
                     }
                 });
             }
+
             public static void Icon(ref CuiElementContainer container, string panel, string color, string imageurl, string min, string max)
             {
                 container.Add(new CuiElement
@@ -769,6 +753,7 @@ namespace Oxide.Plugins
                     }
                 });
             }
+
             public static string Color(string hexColor, float alpha)
             {
                 if (hexColor.StartsWith("#"))
@@ -786,21 +771,39 @@ namespace Oxide.Plugins
         #region config
         private class ConfigData
         {
-            public Settings Settings = new Settings();
+            public Settings Settings;
             public VersionNumber Version;
         }
 
         private class Settings
         {
-            public float cupboardRange = 3f;
-            public float turretRange = 30f;
-            public bool limitToFriends = false;
-            public bool useFriends = false;
-            public bool useClans = false;
-            public bool useTeams = false;
+            public float cupboardRange;
+            public float turretRange;
+            public bool limitToFriends;
+            public bool useFriends;
+            public bool useClans;
+            public bool useTeams;
+            public bool debug;
         }
 
-        protected override void LoadDefaultConfig() => Puts("New configuration file created.");
+        protected override void LoadDefaultConfig()
+        {
+            Puts("Creating new config file.");
+            ConfigData config = new ConfigData
+            {
+                Settings = new Settings()
+                {
+                    cupboardRange = 3f,
+                    turretRange = 30f,
+                    limitToFriends = false,
+                    useFriends = false,
+                    useClans = false,
+                    useTeams = false
+                },
+                Version = Version
+            };
+            SaveConfig(config);
+        }
 
         private void LoadConfigValues()
         {
