@@ -31,7 +31,7 @@ using System.Linq;
 
 namespace Oxide.Plugins
 {
-    [Info("Tool Cupboard GUI", "RFC1920", "1.0.16")]
+    [Info("Tool Cupboard GUI", "RFC1920", "1.0.17")]
     [Description("Manage TC and Turret Auth")]
     internal class TCGui : RustPlugin
     {
@@ -135,6 +135,11 @@ namespace Oxide.Plugins
             if (player == null) return;
             if (!(entity is BuildingPrivlidge)) return;
             if (!permission.UserHasPermission(player.UserIDString, permTCGuiUse)) return;
+
+            CuiHelper.DestroyUi(player, TCGUI);
+            CuiHelper.DestroyUi(player, TCGUB);
+            CuiHelper.DestroyUi(player, TCGUP);
+
             if (!cuploot.ContainsKey(entity.net.ID)) return;
             if (entity == null) return;
 
@@ -142,9 +147,6 @@ namespace Oxide.Plugins
             {
                 cuploot.Remove(entity.net.ID);
             }
-            CuiHelper.DestroyUi(player, TCGUI);
-            CuiHelper.DestroyUi(player, TCGUB);
-            CuiHelper.DestroyUi(player, TCGUP);
         }
         #endregion
 
