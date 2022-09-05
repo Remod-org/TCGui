@@ -31,7 +31,7 @@ using System.Linq;
 
 namespace Oxide.Plugins
 {
-    [Info("Tool Cupboard GUI", "RFC1920", "1.0.17")]
+    [Info("Tool Cupboard GUI", "RFC1920", "1.0.18")]
     [Description("Manage TC and Turret Auth")]
     internal class TCGui : RustPlugin
     {
@@ -113,14 +113,24 @@ namespace Oxide.Plugins
             CuiHelper.DestroyUi(iplayer.Object as BasePlayer, TCGUB);
         }
 
-        private object CanLootEntity(BasePlayer player, StorageContainer container)
+        private object CanLootEntity(BasePlayer player, BuildingPrivlidge privs)
         {
-            if (!permission.UserHasPermission(player.UserIDString, permTCGuiUse)) return null;
-            BuildingPrivlidge privs = container.GetComponentInParent<BuildingPrivlidge>();
             if (privs == null) return null;
-
+            if (player == null) return null;
+            if (!permission.UserHasPermission(player.UserIDString, permTCGuiUse)) return null;
             if (cuploot.ContainsKey(privs.net.ID)) return null;
 
+            bool found = false;
+            foreach (ProtoBuf.PlayerNameID p in privs.authorizedPlayers.ToArray())
+            {
+                if (p.userid == player.userID) found = true;
+                if (IsFriend(player.userID, p.userid)) found = true;
+            }
+            if (!found) return null;
+
+            CuiHelper.DestroyUi(player, TCGUI);
+            CuiHelper.DestroyUi(player, TCGUB);
+            CuiHelper.DestroyUi(player, TCGUP);
             if (player.CanBuild())
             {
                 cuploot.Add(privs.net.ID, player.userID);
