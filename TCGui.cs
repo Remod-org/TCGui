@@ -31,7 +31,7 @@ using System.Linq;
 
 namespace Oxide.Plugins
 {
-    [Info("Tool Cupboard GUI", "RFC1920", "1.0.18")]
+    [Info("Tool Cupboard GUI", "RFC1920", "1.0.19")]
     [Description("Manage TC and Turret Auth")]
     internal class TCGui : RustPlugin
     {
@@ -98,40 +98,34 @@ namespace Oxide.Plugins
         {
             foreach (BasePlayer player in BasePlayer.activePlayerList)
             {
-                CuiHelper.DestroyUi(player, TCGUI);
-                CuiHelper.DestroyUi(player, TCGUP);
-                CuiHelper.DestroyUi(player, TCGUB);
+                ClearUI(player);
             }
+        }
+
+        private void ClearUI(BasePlayer player)
+        {
+            CuiHelper.DestroyUi(player, TCGUI);
+            CuiHelper.DestroyUi(player, TCGUB);
+            CuiHelper.DestroyUi(player, TCGUP);
         }
 
         private void OnUserConnected(IPlayer iplayer) => OnUserDisconnected(iplayer);
 
         private void OnUserDisconnected(IPlayer iplayer)
         {
-            CuiHelper.DestroyUi(iplayer.Object as BasePlayer, TCGUI);
-            CuiHelper.DestroyUi(iplayer.Object as BasePlayer, TCGUP);
-            CuiHelper.DestroyUi(iplayer.Object as BasePlayer, TCGUB);
+            ClearUI(iplayer.Object as BasePlayer);
         }
 
         private object CanLootEntity(BasePlayer player, BuildingPrivlidge privs)
         {
-            if (privs == null) return null;
             if (player == null) return null;
+            if (privs == null) return null;
+
             if (!permission.UserHasPermission(player.UserIDString, permTCGuiUse)) return null;
+            ClearUI(player);
             if (cuploot.ContainsKey(privs.net.ID)) return null;
 
-            bool found = false;
-            foreach (ProtoBuf.PlayerNameID p in privs.authorizedPlayers.ToArray())
-            {
-                if (p.userid == player.userID) found = true;
-                if (IsFriend(player.userID, p.userid)) found = true;
-            }
-            if (!found) return null;
-
-            CuiHelper.DestroyUi(player, TCGUI);
-            CuiHelper.DestroyUi(player, TCGUB);
-            CuiHelper.DestroyUi(player, TCGUP);
-            if (player.CanBuild())
+            if (privs.CanAdministrate(player))
             {
                 cuploot.Add(privs.net.ID, player.userID);
                 TcButtonGUI(player, privs);
@@ -145,18 +139,21 @@ namespace Oxide.Plugins
             if (player == null) return;
             if (!(entity is BuildingPrivlidge)) return;
             if (!permission.UserHasPermission(player.UserIDString, permTCGuiUse)) return;
-
-            CuiHelper.DestroyUi(player, TCGUI);
-            CuiHelper.DestroyUi(player, TCGUB);
-            CuiHelper.DestroyUi(player, TCGUP);
-
+            ClearUI(player);
             if (!cuploot.ContainsKey(entity.net.ID)) return;
+
             if (entity == null) return;
 
             if (cuploot[entity.net.ID] == player.userID)
             {
                 cuploot.Remove(entity.net.ID);
             }
+        }
+
+        private object OnCupboardDeauthorize(BuildingPrivlidge privilege, BasePlayer player)
+        {
+            ClearUI(player);
+            return null;
         }
         #endregion
 
