@@ -31,7 +31,7 @@ using System.Linq;
 
 namespace Oxide.Plugins
 {
-    [Info("Tool Cupboard GUI", "RFC1920", "1.0.19")]
+    [Info("Tool Cupboard GUI", "RFC1920", "1.0.20")]
     [Description("Manage TC and Turret Auth")]
     internal class TCGui : RustPlugin
     {
@@ -123,11 +123,11 @@ namespace Oxide.Plugins
 
             if (!permission.UserHasPermission(player.UserIDString, permTCGuiUse)) return null;
             ClearUI(player);
-            if (cuploot.ContainsKey(privs.net.ID)) return null;
+            if (cuploot.ContainsKey((uint)privs.net.ID.Value)) return null;
 
             if (privs.CanAdministrate(player))
             {
-                cuploot.Add(privs.net.ID, player.userID);
+                cuploot.Add((uint)privs.net.ID.Value, player.userID);
                 TcButtonGUI(player, privs);
             }
 
@@ -140,13 +140,13 @@ namespace Oxide.Plugins
             if (!(entity is BuildingPrivlidge)) return;
             if (!permission.UserHasPermission(player.UserIDString, permTCGuiUse)) return;
             ClearUI(player);
-            if (!cuploot.ContainsKey(entity.net.ID)) return;
+            if (!cuploot.ContainsKey((uint)entity.net.ID.Value)) return;
 
             if (entity == null) return;
 
-            if (cuploot[entity.net.ID] == player.userID)
+            if (cuploot[(uint)entity.net.ID.Value] == player.userID)
             {
-                cuploot.Remove(entity.net.ID);
+                cuploot.Remove((uint)entity.net.ID.Value);
             }
         }
 
@@ -263,7 +263,7 @@ namespace Oxide.Plugins
                         {
                             CuiHelper.DestroyUi(player, TCGUP);
                             // tc tremove 7656XXXXXXXXXXXX TURRETID
-                            AutoTurret turret = BaseNetworkable.serverEntities.Find(uint.Parse(args[2])) as AutoTurret;
+                            AutoTurret turret = BaseNetworkable.serverEntities.Find(new NetworkableId(uint.Parse(args[2]))) as AutoTurret;
 
                             if (turret != null)
                             {
@@ -282,7 +282,7 @@ namespace Oxide.Plugins
                         {
                             CuiHelper.DestroyUi(player, TCGUP);
                             // tc tadd 7656XXXXXXXXXXXX NAME TURRETID
-                            AutoTurret turret = BaseNetworkable.serverEntities.Find(uint.Parse(args[3])) as AutoTurret;
+                            AutoTurret turret = BaseNetworkable.serverEntities.Find(new NetworkableId(uint.Parse(args[3]))) as AutoTurret;
 
                             if (turret != null)
                             {
@@ -339,14 +339,10 @@ namespace Oxide.Plugins
             }
             if (configData.Settings.useTeams)
             {
-                BasePlayer player = BasePlayer.FindByID(playerid);
-                if (player != null && player.currentTeam != 0)
+                RelationshipManager.PlayerTeam playerTeam = RelationshipManager.ServerInstance.FindPlayersTeam(playerid);
+                if (playerTeam?.members.Contains(ownerid) == true)
                 {
-                    RelationshipManager.PlayerTeam playerTeam = RelationshipManager.ServerInstance.FindTeam(player.currentTeam);
-                    if (playerTeam?.members.Contains(ownerid) == true)
-                    {
-                        return true;
-                    }
+                    return true;
                 }
             }
             return false;
@@ -416,8 +412,8 @@ namespace Oxide.Plugins
             row = 0;
             foreach (AutoTurret turret in turrets)
             {
-                if (foundturrets.Contains(turret.net.ID)) continue;
-                foundturrets.Add(turret.net.ID);
+                if (foundturrets.Contains((uint)turret.net.ID.Value)) continue;
+                foundturrets.Add((uint)turret.net.ID.Value);
 
                 float[] posn = GetButtonPosition(row, 4);
                 UI.Label(ref container, TCGUI, UI.Color("#ffffff", 1f), turret.net.ID.ToString(), 12, $"{posn[0]} {posn[1]}", $"{posn[0] + ((posn[2] - posn[0]) / 2)} {posn[3]}", TextAnchor.MiddleLeft);
